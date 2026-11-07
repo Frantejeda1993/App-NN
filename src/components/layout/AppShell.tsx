@@ -27,7 +27,8 @@ export function AppShell() {
   const { signOut } = useAuth()
 
   return (
-    <div className="min-h-dvh bg-background text-foreground md:grid md:grid-cols-[15rem_1fr]">
+    // minmax(0,1fr): la columna principal puede encogerse; las tablas anchas scrollean dentro de su tarjeta.
+    <div className="min-h-dvh bg-background text-foreground md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       {/* Menú lateral: PC / tablet */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card md:flex">
         <div className="px-5 py-5 text-lg font-semibold tracking-tight">

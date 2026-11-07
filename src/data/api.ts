@@ -13,6 +13,7 @@ import type {
   MovementDataSchema,
   ProjectData,
   ProjectDataSchema,
+  QuoteData,
   Stored,
   WorkshopSettings,
 } from '@/model'
@@ -25,6 +26,7 @@ export type Contact = Stored<ContactData>
 export type Project = Stored<ProjectData>
 export type Box = Stored<BoxData>
 export type GeneralExpense = Stored<GeneralExpenseData>
+export type Quote = Stored<QuoteData>
 export type Movement = Stored<MovementData> & MovementControl
 
 /** Una versión de un movimiento en el historial (auditLog). */
@@ -68,6 +70,8 @@ export interface DataApi {
   createBox(input: z.input<typeof BoxDataSchema>, by: string): WriteResult
   updateBox(id: string, next: BoxData, by: string): WriteResult
 
+  /** Presupuestos (por ahora solo lectura; el editor llega en el paso 9). */
+  watchQuotes(cb: (quotes: Quote[]) => void): Unsubscribe
   watchGeneralExpenses(cb: (expenses: GeneralExpense[]) => void): Unsubscribe
   createGeneralExpense(input: z.input<typeof GeneralExpenseDataSchema>, by: string): WriteResult
   /** `next` es el gasto completo (no un parche). */

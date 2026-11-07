@@ -7,6 +7,7 @@ import {
   MovementDataSchema,
   type GeneralExpenseData,
   ProjectDataSchema,
+  QuoteDataSchema,
   type BoxData,
   type MovementData,
   WorkshopSettingsSchema,
@@ -29,6 +30,7 @@ import {
   type DataApi,
   type Member,
   type Project,
+  type Quote,
 } from '@/data/api'
 import type { WriteResult } from '@/data/repo'
 
@@ -204,6 +206,20 @@ export class FakeDataApi implements DataApi {
     const prev = this.boxes.get(id)!
     this.boxes.set(id, { ...BoxDataSchema.parse(next), ...this.stamp(by, prev), id })
     return this.done(id)
+  }
+
+  // ---- presupuestos (solo lectura por ahora) ----
+  quotes = new Map<string, Quote>()
+
+  seedQuote(input: Record<string, unknown>, id = `q${++this.seq}`): Quote {
+    const q: Quote = { ...QuoteDataSchema.parse(input), ...this.stamp('nacho@gmail.com'), id }
+    this.quotes.set(id, q)
+    this.emit()
+    return q
+  }
+
+  watchQuotes(cb: (q: Quote[]) => void) {
+    return this.watch(() => cb([...this.quotes.values()]))
   }
 
   // ---- gastos generales ----

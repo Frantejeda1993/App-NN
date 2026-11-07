@@ -37,7 +37,7 @@ export function MovementNewPage() {
       ? `/proyectos/${encodeURIComponent(projectId)}`
       : type === 'gasto_general'
         ? '/billetera?tab=gastos'
-        : '/billetera'
+        : '/billetera?tab=movimientos'
   // Pago de un gasto general: arranca con su importe habitual, categoría y nombre.
   const initial = expense
     ? {

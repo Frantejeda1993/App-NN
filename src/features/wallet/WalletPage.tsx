@@ -10,18 +10,19 @@ import { boxBalances, filterMovements, memberDebts, type MovementFilters } from 
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { BoxDataSchema, MOVEMENT_TYPES, type MovementType } from '@/model'
+import { DashboardTab } from './DashboardTab'
 import { GeneralExpensesTab } from './GeneralExpensesTab'
 import { MovementRow } from './MovementRow'
 import { TYPE_LABELS } from './labels'
 import { useWalletNames } from './useWalletNames'
 
-const TABS = { movimientos: 'Movimientos', cajas: 'Cajas', gastos: 'Gastos generales' } as const
+const TABS = { resumen: 'Resumen', movimientos: 'Movimientos', cajas: 'Cajas', gastos: 'Gastos generales' } as const
 type Tab = keyof typeof TABS
 
 export function WalletPage() {
   const [params, setParams] = useSearchParams()
   const requested = params.get('tab')
-  const tab: Tab = requested === 'cajas' || requested === 'gastos' ? requested : 'movimientos'
+  const tab: Tab = requested === 'movimientos' || requested === 'cajas' || requested === 'gastos' ? requested : 'resumen'
 
   return (
     <section className="flex flex-col gap-4">
@@ -37,7 +38,7 @@ export function WalletPage() {
             key={t}
             role="tab"
             aria-selected={tab === t}
-            onClick={() => setParams(t === 'movimientos' ? {} : { tab: t })}
+            onClick={() => setParams(t === 'resumen' ? {} : { tab: t })}
             className={cn(
               'rounded-full px-3 py-1 text-sm',
               tab === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -47,7 +48,15 @@ export function WalletPage() {
           </button>
         ))}
       </div>
-      {tab === 'movimientos' ? <MovementsTab /> : tab === 'cajas' ? <BoxesTab /> : <GeneralExpensesTab />}
+      {tab === 'resumen' ? (
+        <DashboardTab />
+      ) : tab === 'movimientos' ? (
+        <MovementsTab />
+      ) : tab === 'cajas' ? (
+        <BoxesTab />
+      ) : (
+        <GeneralExpensesTab />
+      )}
     </section>
   )
 }

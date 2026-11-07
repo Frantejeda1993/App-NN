@@ -19,6 +19,7 @@ import {
   MovementBaseSchema,
   MovementControlSchema,
   ProjectDataSchema,
+  QuoteDataSchema,
   SETTINGS_DOCS,
   WorkshopSettingsSchema,
   type AuditFields,
@@ -154,6 +155,14 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
 
     updateBox(id, next, by) {
       return updateDocument(db, COLLECTIONS.boxes, id, BoxDataSchema, next, by)
+    },
+
+    watchQuotes(cb) {
+      return onSnapshot(
+        collection(db, COLLECTIONS.quotes),
+        (snap) => cb(snap.docs.map((d) => toStored(QuoteDataSchema, d)).filter((q) => q !== null).sort(byCreatedDesc)),
+        onError('presupuestos'),
+      )
     },
 
     watchGeneralExpenses(cb) {

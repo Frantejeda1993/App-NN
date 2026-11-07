@@ -66,7 +66,7 @@ describe('nuevo movimiento', () => {
     expect(movements(api)[0]).toMatchObject({ paidBy: 'nacho@gmail.com', boxId: null, projectId: cocina.id })
     unmount()
 
-    const r = renderApp('/billetera', api)
+    const r = renderApp('/billetera?tab=movimientos', api)
     expect(await screen.findByText(/el taller les debe/i)).toBeInTheDocument()
     expect(screen.getByText('263,68 €')).toBeInTheDocument()
     r.unmount()
@@ -215,7 +215,7 @@ describe('detalle: editar, eliminar e historial', () => {
     expect(await screen.findByText(/motivo de la baja/i)).toBeInTheDocument()
     unmount()
 
-    renderApp('/billetera', api)
+    renderApp('/billetera?tab=movimientos', api)
     expect(await screen.findByText(/no hay movimientos con estos filtros/i)).toBeInTheDocument()
     await userEvent.click(screen.getByLabelText(/mostrar eliminados/i))
     expect(screen.getByText(/seña duplicada/i)).toBeInTheDocument()
