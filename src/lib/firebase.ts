@@ -40,6 +40,8 @@ export function getFirebase(): { app: FirebaseApp; auth: Auth; db: Firestore } {
     // datos ya vistos y sincroniza al volver la red (varias pestañas a la vez).
     db = initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      // Los campos opcionales sin valor se omiten en lugar de fallar.
+      ignoreUndefinedProperties: true,
     })
   }
   return { app, auth, db }
