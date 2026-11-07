@@ -7,9 +7,13 @@ import {
 } from '@firebase/rules-unit-testing'
 import {
   Timestamp,
+  collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
+  where,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -321,6 +325,19 @@ describe('movimientos', () => {
         entity: 'movements', entityId: id, version: 9, action: 'update', before: null, after: {}, by: NACHO, at: serverTimestamp(),
       }),
     )
+  })
+
+  it('el historial de un movimiento se consulta por entityId (solo socios)', async () => {
+    const db = dbAs(NACHO)
+    const { id, committed } = createMovement(db, cobro, NACHO)
+    await committed
+    const current = await loadMovement(db, id)
+    await updateMovement(db, current, { ...MovementDataSchema.parse(cobro), amountCents: 1 }, NACHO).committed
+
+    const q = query(collection(db, 'auditLog'), where('entityId', '==', id))
+    const snap = await assertSucceeds(getDocs(q))
+    expect(snap.docs.map((d) => d.data().version).sort()).toEqual([1, 2])
+    await assertFails(getDocs(query(collection(dbAs('extrano@gmail.com'), 'auditLog'), where('entityId', '==', id))))
   })
 
   it('un no socio no puede crear movimientos', async () => {

@@ -1,4 +1,4 @@
-import type { Client, Contact, Member, Project, SettingsState } from './api'
+import type { AuditEntry, Box, Client, Contact, Member, Movement, Project, SettingsState } from './api'
 import { useData, useLive } from './DataProvider'
 
 /** Hooks tipados de lectura en tiempo real. `undefined` = cargando. */
@@ -37,6 +37,21 @@ export function useProjects(): Project[] | undefined {
 export function useProject(id: string): Project | null | undefined {
   const api = useData()
   return useLive<Project | null>((cb) => (id ? api.watchProject(id, cb) : none(cb)), [id])
+}
+
+export function useBoxes(): Box[] | undefined {
+  const api = useData()
+  return useLive<Box[]>((cb) => api.watchBoxes(cb), [])
+}
+
+export function useMovements(): Movement[] | undefined {
+  const api = useData()
+  return useLive<Movement[]>((cb) => api.watchMovements(cb), [])
+}
+
+export function useMovementHistory(id: string): AuditEntry[] | undefined {
+  const api = useData()
+  return useLive<AuditEntry[]>((cb) => (id ? api.watchMovementHistory(id, cb) : (cb([]), () => {})), [id])
 }
 
 export function useWorkshopSettings(): SettingsState | undefined {

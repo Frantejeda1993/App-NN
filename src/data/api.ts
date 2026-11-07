@@ -1,9 +1,14 @@
 import type { z } from 'zod'
 import type {
+  BoxData,
+  BoxDataSchema,
   ClientData,
   ClientDataSchema,
   ContactData,
   ContactDataSchema,
+  MovementControl,
+  MovementData,
+  MovementDataSchema,
   ProjectData,
   ProjectDataSchema,
   Stored,
@@ -16,6 +21,19 @@ export type Unsubscribe = () => void
 export type Client = Stored<ClientData>
 export type Contact = Stored<ContactData>
 export type Project = Stored<ProjectData>
+export type Box = Stored<BoxData>
+export type Movement = Stored<MovementData> & MovementControl
+
+/** Una versión de un movimiento en el historial (auditLog). */
+export interface AuditEntry {
+  id: string
+  version: number
+  action: 'create' | 'update' | 'delete'
+  before: Record<string, unknown> | null
+  after: Record<string, unknown>
+  by: string
+  at: Date | null
+}
 
 export interface Member {
   email: string
@@ -43,6 +61,17 @@ export interface DataApi {
   watchProjects(cb: (projects: Project[]) => void): Unsubscribe
   watchProject(id: string, cb: (project: Project | null) => void): Unsubscribe
 
+  watchBoxes(cb: (boxes: Box[]) => void): Unsubscribe
+  createBox(input: z.input<typeof BoxDataSchema>, by: string): WriteResult
+  updateBox(id: string, next: BoxData, by: string): WriteResult
+
+  watchMovements(cb: (movements: Movement[]) => void): Unsubscribe
+  watchMovementHistory(movementId: string, cb: (entries: AuditEntry[]) => void): Unsubscribe
+  createMovement(input: z.input<typeof MovementDataSchema>, by: string): WriteResult
+  /** `current` es la versión que el usuario estaba viendo (detecta conflictos). */
+  updateMovement(current: Movement, next: MovementData, by: string): WriteResult
+  deleteMovement(current: Movement, reason: string, by: string): WriteResult
+
   createProject(input: z.input<typeof ProjectDataSchema>, by: string): WriteResult
   /** `next` es el proyecto completo (no un parche). */
   updateProject(id: string, next: ProjectData, by: string): WriteResult
@@ -66,6 +95,10 @@ export const byName = (a: { name: string }, b: { name: string }) =>
 /** Proyectos por fecha de creación, los más nuevos primero. */
 export const byCreatedDesc = (a: { createdAt: { toMillis(): number } }, b: { createdAt: { toMillis(): number } }) =>
   (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
+
+/** Movimientos del más reciente al más antiguo (fecha y, a igual fecha, alta). */
+export const byMovementDesc = (a: Movement, b: Movement) =>
+  a.date !== b.date ? (a.date < b.date ? 1 : -1) : byCreatedDesc(a, b)
 
 /** Contactos del más reciente al más antiguo. */
 export const byDateDesc = (a: { date: string }, b: { date: string }) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)

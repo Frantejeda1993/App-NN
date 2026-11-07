@@ -2,6 +2,8 @@ import {
   collection,
   doc,
   onSnapshot,
+  query,
+  where,
   type DocumentSnapshot,
   type Firestore,
 } from 'firebase/firestore'
@@ -11,15 +13,20 @@ import {
   COLLECTIONS,
   ClientDataSchema,
   ContactDataSchema,
+  BoxDataSchema,
   MemberDataSchema,
+  MovementBaseSchema,
+  MovementControlSchema,
   ProjectDataSchema,
   SETTINGS_DOCS,
   WorkshopSettingsSchema,
   type AuditFields,
   type Stored,
 } from '@/model'
-import { byCreatedDesc, byDateDesc, byName, type DataApi } from './api'
-import { addContact, createDocument, updateDocument } from './repo'
+import { byCreatedDesc, byDateDesc, byMovementDesc, byName, type DataApi } from './api'
+import { addContact, createDocument, createMovement, deleteMovement, updateDocument, updateMovement } from './repo'
+
+const StoredMovementSchema = MovementBaseSchema.extend(MovementControlSchema.shape)
 
 /**
  * Convierte un documento en datos validados + auditoría + id. Un documento que
@@ -130,6 +137,77 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
 
     watchProject(id, cb) {
       return onSnapshot(doc(db, COLLECTIONS.projects, id), (snap) => cb(toStored(ProjectDataSchema, snap)), onError('proyecto'))
+    },
+
+    watchBoxes(cb) {
+      return onSnapshot(
+        collection(db, COLLECTIONS.boxes),
+        (snap) => cb(snap.docs.map((d) => toStored(BoxDataSchema, d)).filter((b) => b !== null).sort(byName)),
+        onError('cajas'),
+      )
+    },
+
+    createBox(input, by) {
+      return createDocument(db, COLLECTIONS.boxes, BoxDataSchema, input, by)
+    },
+
+    updateBox(id, next, by) {
+      return updateDocument(db, COLLECTIONS.boxes, id, BoxDataSchema, next, by)
+    },
+
+    watchMovements(cb) {
+      return onSnapshot(
+        collection(db, COLLECTIONS.movements),
+        (snap) => {
+          // Lectura tolerante (sin reglas cruzadas): un movimiento viejo o editado a
+          // mano en la consola se sigue viendo y se puede corregir.
+          const list = snap.docs.map((d) => toStored(StoredMovementSchema, d)).filter((m) => m !== null)
+          // Un movimiento ilegible quedaría fuera de saldos y totales: se avisa.
+          const unreadable = snap.size - list.length
+          if (unreadable > 0) {
+            toast.warning(
+              `${unreadable} movimiento${unreadable > 1 ? 's' : ''} con datos inválidos no se cuenta${unreadable > 1 ? 'n' : ''} en los saldos. Revisalos en la consola de Firebase.`,
+              { id: 'unreadable-movements', duration: Infinity },
+            )
+          }
+          cb(list.sort(byMovementDesc))
+        },
+        onError('movimientos'),
+      )
+    },
+
+    watchMovementHistory(movementId, cb) {
+      return onSnapshot(
+        query(collection(db, COLLECTIONS.auditLog), where('entityId', '==', movementId)),
+        (snap) => {
+          const entries = snap.docs.map((d) => {
+            const x = d.data({ serverTimestamps: 'estimate' })
+            return {
+              id: d.id,
+              version: x.version,
+              action: x.action,
+              before: x.before ?? null,
+              after: x.after ?? {},
+              by: x.by,
+              at: x.at?.toDate?.() ?? null,
+            }
+          })
+          cb(entries.sort((a, b) => a.version - b.version))
+        },
+        onError('historial'),
+      )
+    },
+
+    createMovement(input, by) {
+      return createMovement(db, input, by)
+    },
+
+    updateMovement(current, next, by) {
+      return updateMovement(db, current, next, by)
+    },
+
+    deleteMovement(current, reason, by) {
+      return deleteMovement(db, current, reason, by)
     },
 
     createProject(input, by) {

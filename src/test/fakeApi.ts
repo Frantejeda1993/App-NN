@@ -1,8 +1,12 @@
 import { Timestamp } from 'firebase/firestore'
 import {
+  BoxDataSchema,
   ClientDataSchema,
   ContactDataSchema,
+  MovementDataSchema,
   ProjectDataSchema,
+  type BoxData,
+  type MovementData,
   WorkshopSettingsSchema,
   type ClientData,
   type ContactData,
@@ -12,8 +16,12 @@ import {
 import {
   byCreatedDesc,
   byDateDesc,
+  byMovementDesc,
   byName,
+  type AuditEntry,
+  type Box,
   type Client,
+  type Movement,
   type Contact,
   type DataApi,
   type Member,
@@ -156,6 +164,84 @@ export class FakeDataApi implements DataApi {
     if (!prev) throw new Error('no existe')
     this.projects.set(id, { ...ProjectDataSchema.parse(next), ...this.stamp(by, prev), id })
     return this.done(id)
+  }
+
+  // ---- cajas y movimientos ----
+  boxes = new Map<string, Box>()
+  movements = new Map<string, Movement>()
+  history = new Map<string, AuditEntry[]>()
+
+  seedBox(name: string, id = `b${++this.seq}`, active = true): Box {
+    const b: Box = { ...BoxDataSchema.parse({ name, active }), ...this.stamp('nacho@gmail.com'), id }
+    this.boxes.set(id, b)
+    this.emit()
+    return b
+  }
+
+  seedMovement(input: Record<string, unknown>, id = `m${++this.seq}`): Movement {
+    const data = MovementDataSchema.parse(input)
+    const mv: Movement = { ...data, version: 1, deleted: false, deletedReason: '', ...this.stamp('nacho@gmail.com'), id }
+    this.movements.set(id, mv)
+    this.history.set(id, [{ id: `${id}_v1`, version: 1, action: 'create', before: null, after: { ...data }, by: 'nacho@gmail.com', at: new Date() }])
+    this.emit()
+    return mv
+  }
+
+  watchBoxes(cb: (b: Box[]) => void) {
+    return this.watch(() => cb([...this.boxes.values()].sort(byName)))
+  }
+
+  createBox(input: unknown, by: string) {
+    const id = `b${++this.seq}`
+    this.boxes.set(id, { ...BoxDataSchema.parse(input), ...this.stamp(by), id })
+    return this.done(id)
+  }
+
+  updateBox(id: string, next: BoxData, by: string) {
+    const prev = this.boxes.get(id)!
+    this.boxes.set(id, { ...BoxDataSchema.parse(next), ...this.stamp(by, prev), id })
+    return this.done(id)
+  }
+
+  watchMovements(cb: (m: Movement[]) => void) {
+    return this.watch(() => cb([...this.movements.values()].sort(byMovementDesc)))
+  }
+
+  watchMovementHistory(id: string, cb: (h: AuditEntry[]) => void) {
+    return this.watch(() => cb([...(this.history.get(id) ?? [])]))
+  }
+
+  createMovement(input: unknown, by: string) {
+    const data = MovementDataSchema.parse(input)
+    const id = `m${++this.seq}`
+    this.movements.set(id, { ...data, version: 1, deleted: false, deletedReason: '', ...this.stamp(by), id })
+    this.history.set(id, [{ id: `${id}_v1`, version: 1, action: 'create', before: null, after: { ...data }, by, at: new Date() }])
+    return this.done(id)
+  }
+
+  /** Simula las reglas: si la versión que el usuario veía ya no es la actual, se rechaza. */
+  private writeVersion(current: Movement, after: Movement, action: 'update' | 'delete', by: string) {
+    const stored = this.movements.get(current.id)!
+    if (stored.version !== current.version || stored.deleted) {
+      const err = Object.assign(new Error('conflicto'), { code: 'permission-denied' })
+      const committed = Promise.reject(err)
+      committed.catch(() => {})
+      return { id: current.id, committed }
+    }
+    this.movements.set(current.id, { ...after, ...this.stamp(by, stored) })
+    const h = this.history.get(current.id) ?? []
+    h.push({ id: `${current.id}_v${after.version}`, version: after.version, action, before: { ...stored }, after: { ...after }, by, at: new Date() })
+    this.history.set(current.id, h)
+    return this.done(current.id)
+  }
+
+  updateMovement(current: Movement, next: MovementData, by: string) {
+    const data = MovementDataSchema.parse(next)
+    return this.writeVersion(current, { ...current, ...data, version: current.version + 1 }, 'update', by)
+  }
+
+  deleteMovement(current: Movement, reason: string, by: string) {
+    return this.writeVersion(current, { ...current, deleted: true, deletedReason: reason, version: current.version + 1 }, 'delete', by)
   }
 
   saveWorkshopSettings(next: WorkshopSettings) {
