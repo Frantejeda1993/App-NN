@@ -42,6 +42,26 @@ npm run dev
 Cada push a `main` corre lint, typecheck y tests (incluidas las reglas), y si todo pasa publica en
 `https://frantejeda1993.github.io/App-NN/`.
 
+## Seguridad y datos
+
+La app no tiene backend propio: **`firestore.rules` es la única barrera real**. La app valida todo con zod (`src/model`), pero las reglas son las que deciden qué se puede leer y escribir.
+
+- **Socios:** solo un socio activo (`members/{email}` con `active: true`) puede leer o escribir. Los ids de `members` tienen que estar **en minúsculas**: un id con mayúsculas nunca da acceso.
+- **Auditoría:** cada documento lleva `createdBy/createdAt/updatedBy/updatedAt`, y los pone el servidor. Nadie puede firmar como otro socio ni inventar la fecha.
+- **Movimientos de dinero:**
+  - No se borran: se marcan como eliminados.
+  - Cada alta, edición o baja sube la versión y escribe `auditLog/{id}_v{n}` con el estado anterior y el nuevo. Las reglas verifican que el registro coincida exactamente con el movimiento.
+  - Si dos socios editan el mismo movimiento a la vez, el segundo recibe un error de conflicto.
+- **Presupuestos:** solo se borran los que están en borrador. Uno enviado no puede volver a borrador.
+- **Dinero:** se guarda en céntimos enteros. Los porcentajes se guardan en puntos básicos (10000 = 100 %).
+
+Riesgos aceptados (equipo chico de socios de confianza):
+
+- Cualquier socio puede editar cualquier dato; el registro de auditoría muestra quién lo hizo.
+- Las reglas no validan que los repartos sumen 100 %, las transiciones de estado de proyectos ni que los ids referenciados existan. Eso lo controla la app.
+- Al desactivar un socio, sus escrituras se rechazan enseguida. Las pantallas que ya tenía abiertas pueden seguir mostrando datos un rato.
+- Quien edita directamente desde la consola de Firebase se saltea todas las reglas.
+
 ## Sin conexión
 
 - La app se instala como PWA y abre sin internet después de la primera visita.

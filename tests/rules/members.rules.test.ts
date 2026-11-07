@@ -57,8 +57,13 @@ describe('members', () => {
     await assertFails(getDocs(collection(db, 'members')))
   })
 
-  it('ni siquiera un socio activo puede listar members (no expone emails)', async () => {
+  it('un socio activo puede listar members (participaciones, quién pagó)', async () => {
     const db = env.authenticatedContext('u1', socio).firestore()
+    await assertSucceeds(getDocs(collection(db, 'members')))
+  })
+
+  it('un socio inactivo no puede listar members', async () => {
+    const db = env.authenticatedContext('u3', inactivo).firestore()
     await assertFails(getDocs(collection(db, 'members')))
   })
 

@@ -1,9 +1,11 @@
 rules_version = '2';
 
+// Única barrera de seguridad real (plan Spark, sin backend): la app valida con
+// zod, pero estas reglas deciden qué se puede leer y escribir.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---- Helpers ----------------------------------------------------------
+    // ---- Identidad --------------------------------------------------------
     function signedIn() {
       return request.auth != null
         && request.auth.token.email != null
@@ -26,16 +28,262 @@ service cloud.firestore {
         && get(memberPath()).data.active == true;
     }
 
-    // ---- Lista blanca -----------------------------------------------------
+    // ---- Auditoría: quién y cuándo los pone el servidor, no el cliente ------
+    function auditCreateOk() {
+      let d = request.resource.data;
+      return d.createdBy == emailKey() && d.updatedBy == emailKey()
+        && d.createdAt == request.time && d.updatedAt == request.time;
+    }
+
+    function auditUpdateOk() {
+      let d = request.resource.data;
+      return d.updatedBy == emailKey() && d.updatedAt == request.time
+        && d.createdBy == resource.data.createdBy
+        && d.createdAt == resource.data.createdAt;
+    }
+
+    function canCreate() { return isMember() && auditCreateOk() && sizeOk(); }
+    function canUpdate() { return isMember() && auditUpdateOk() && sizeOk(); }
+
+    // ---- Validaciones básicas ----------------------------------------------
+    function nonEmptyString(v, max) {
+      return v is string && v.size() > 0 && v.size() <= max;
+    }
+
+    function isCents(v) { return v is int; }
+    function isPositiveCents(v) { return v is int && v > 0; }
+
+    // Reparto: hasta 20 participantes. Que sume 100 % lo valida la app (las
+    // reglas no pueden sumar los valores de un mapa dinámico).
+    function validShares(s) { return s is map && s.size() > 0 && s.size() <= 20; }
+
+    // Tope de campos por documento (evita inflar documentos con basura).
+    function sizeOk() { return request.resource.data.size() <= 40; }
+
+    // ---- Lista blanca -------------------------------------------------------
     // Los socios se dan de alta desde la consola de Firebase (nunca desde la app).
     match /members/{email} {
-      // Cada usuario puede consultar SOLO su propio documento (para saber si tiene acceso).
+      // Cada usuario puede consultar su propio documento (para saber si tiene acceso).
       allow get: if signedIn() && email == emailKey();
-      // Nadie lista la colección completa (expondría los emails de todos los socios).
-      allow list: if false;
+      // Los socios activos ven la lista (participaciones, "quién pagó").
+      allow list: if isMember();
       allow write: if false;
     }
 
-    // Todo lo demás queda cerrado hasta que el paso 2 defina cada colección.
+    // ---- Configuración ------------------------------------------------------
+    match /settings/{docId} {
+      allow read: if isMember();
+      allow create: if canCreate() && docId in ['workshop', 'services'];
+      allow update: if canUpdate();
+      allow delete: if false;
+    }
+
+    // ---- Clientes -----------------------------------------------------------
+    function validClient() {
+      return nonEmptyString(request.resource.data.name, 200);
+    }
+
+    match /clients/{clientId} {
+      allow read: if isMember();
+      allow create: if canCreate() && validClient();
+      allow update: if canUpdate() && validClient();
+      allow delete: if false; // se conservan por historial
+
+      match /contacts/{contactId} {
+        allow read: if isMember();
+        allow create: if canCreate() && request.resource.data.date is string;
+        allow update: if canUpdate() && request.resource.data.date is string;
+        allow delete: if isMember();
+      }
+    }
+
+    // ---- Proyectos ----------------------------------------------------------
+    function validProject() {
+      let d = request.resource.data;
+      return nonEmptyString(d.title, 200)
+        && nonEmptyString(d.clientId, 128)
+        && d.status in ['pendiente', 'en_proceso', 'entregado', 'finalizado', 'cobrado', 'cancelado', 'archivado']
+        && validShares(d.shares);
+    }
+
+    match /projects/{projectId} {
+      allow read: if isMember();
+      allow create: if canCreate() && validProject();
+      allow update: if canUpdate() && validProject();
+      allow delete: if false; // se archivan
+    }
+
+    // ---- Cajas y gastos generales ---------------------------------------------
+    match /boxes/{boxId} {
+      allow read: if isMember();
+      allow create: if canCreate() && nonEmptyString(request.resource.data.name, 200);
+      allow update: if canUpdate() && nonEmptyString(request.resource.data.name, 200);
+      allow delete: if false; // se desactivan
+    }
+
+    function validGeneralExpense() {
+      let d = request.resource.data;
+      return nonEmptyString(d.name, 200)
+        && d.kind in ['fijo', 'esporadico']
+        && isPositiveCents(d.amountCents)
+        && validShares(d.shares);
+    }
+
+    match /generalExpenses/{expenseId} {
+      allow read: if isMember();
+      allow create: if canCreate() && validGeneralExpense();
+      allow update: if canUpdate() && validGeneralExpense();
+      allow delete: if false;
+    }
+
+    // ---- Movimientos de dinero: versionados, auditados, sin borrado físico ---
+    function optId(v) { return v == null || (v is string && v.size() > 0 && v.size() <= 128); }
+    function isId(v) { return v is string && v.size() > 0 && v.size() <= 128; }
+    // Socio referenciado (quién pagó / retiro…) debe existir en members.
+    function optMember(v) {
+      return v == null || (v is string && exists(/databases/$(database)/documents/members/$(v)));
+    }
+
+    function validMovement() {
+      let d = request.resource.data;
+      let fields = ['type', 'status', 'amountCents', 'date', 'boxId', 'toBoxId', 'paidBy', 'memberEmail',
+        'projectId', 'projectSplits', 'generalExpenseId', 'category', 'description',
+        'version', 'deleted', 'deletedReason', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'];
+      let isExpense = d.type in ['gasto_proyecto', 'gasto_general'];
+      let usesMember = d.type in ['retiro', 'aporte', 'reintegro'];
+      return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && d.type in ['cobro', 'gasto_proyecto', 'gasto_general', 'retiro', 'aporte', 'transferencia', 'reintegro']
+        && d.status in ['pagado', 'pendiente_pago']
+        && isPositiveCents(d.amountCents)
+        && d.date is string && d.date.size() == 10
+        && d.version is int
+        && d.deleted is bool
+        && d.deletedReason is string && d.deletedReason.size() <= 500
+        && d.description is string && d.description.size() <= 5000
+        && d.category is string && d.category.size() <= 100
+        && optId(d.boxId) && optId(d.toBoxId) && optId(d.projectId) && optId(d.generalExpenseId)
+        && d.projectSplits is list && d.projectSplits.size() <= 50
+        && optMember(d.paidBy) && optMember(d.memberEmail)
+        // Reglas por tipo (espejo de MovementDataSchema).
+        && (d.status == 'pagado' || isExpense)
+        && (d.type == 'transferencia' || d.toBoxId == null)
+        && (isExpense || d.paidBy == null)
+        && (usesMember || d.memberEmail == null)
+        && (d.type != 'cobro' || (isId(d.projectId) && isId(d.boxId)))
+        && (!usesMember || (d.memberEmail != null && isId(d.boxId)))
+        && (d.type != 'transferencia' || (isId(d.boxId) && isId(d.toBoxId) && d.boxId != d.toBoxId))
+        && (d.type != 'gasto_general' || isId(d.generalExpenseId))
+        && (d.type != 'gasto_proyecto' || isId(d.projectId) || d.projectSplits.size() > 0)
+        && (!isExpense || d.status != 'pagado' || ((d.boxId == null) != (d.paidBy == null)));
+    }
+
+    // La entrada auditLog/{id}_v{version} debe escribirse en el mismo batch.
+    function hasAuditLog(movementId, version) {
+      return existsAfter(/databases/$(database)/documents/auditLog/$(movementId + '_v' + string(version)));
+    }
+
+    match /movements/{movementId} {
+      allow read: if isMember();
+      allow create: if canCreate() && validMovement()
+        && request.resource.data.version == 1
+        && request.resource.data.deleted == false
+        && hasAuditLog(movementId, 1);
+      allow update: if canUpdate() && validMovement()
+        && resource.data.deleted == false
+        && request.resource.data.version == resource.data.version + 1
+        && hasAuditLog(movementId, request.resource.data.version);
+      allow delete: if false;
+    }
+
+    // El registro debe reflejar EXACTAMENTE el movimiento: `after` = estado nuevo y
+    // `before` = estado anterior (ambos sin los campos de auditoría).
+    function logMatchesMovement(log) {
+      let path = /databases/$(database)/documents/movements/$(log.entityId);
+      let auditKeys = ['createdBy', 'createdAt', 'updatedBy', 'updatedAt'];
+      let afterDoc = getAfter(path).data;
+      return log.after is map
+        && afterDoc.diff(log.after).affectedKeys().hasOnly(auditKeys)
+        && (log.version == 1
+          ? (log.action == 'create' && log.before == null)
+          : (log.action in ['update', 'delete'] && log.before is map
+            && get(path).data.diff(log.before).affectedKeys().hasOnly(auditKeys)))
+        && (log.action != 'delete' || afterDoc.deleted == true)
+        && (log.action != 'update' || afterDoc.deleted == false);
+    }
+
+    match /auditLog/{logId} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['entity', 'entityId', 'version', 'action', 'before', 'after', 'by', 'at'])
+        && request.resource.data.by == emailKey()
+        && request.resource.data.at == request.time
+        && request.resource.data.entity == 'movements'
+        && request.resource.data.version is int
+        && logId == request.resource.data.entityId + '_v' + string(request.resource.data.version)
+        && getAfter(/databases/$(database)/documents/movements/$(request.resource.data.entityId)).data.version
+          == request.resource.data.version
+        && logMatchesMovement(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ---- Catálogos y plantillas -------------------------------------------------
+    match /catalogMaterials/{itemId} {
+      allow read: if isMember();
+      allow create: if canCreate() && nonEmptyString(request.resource.data.name, 200)
+        && isCents(request.resource.data.sheetPriceCents);
+      allow update: if canUpdate() && nonEmptyString(request.resource.data.name, 200)
+        && isCents(request.resource.data.sheetPriceCents);
+      allow delete: if false; // se desactivan (los presupuestos los referencian)
+    }
+
+    match /catalogEdgeBanding/{itemId} {
+      allow read: if isMember();
+      allow create: if canCreate() && nonEmptyString(request.resource.data.name, 200)
+        && isCents(request.resource.data.pricePerMeterCents);
+      allow update: if canUpdate() && nonEmptyString(request.resource.data.name, 200)
+        && isCents(request.resource.data.pricePerMeterCents);
+      allow delete: if false;
+    }
+
+    match /catalogHardware/{itemId} {
+      allow read: if isMember();
+      allow create: if canCreate() && nonEmptyString(request.resource.data.name, 200)
+        && isCents(request.resource.data.priceCents);
+      allow update: if canUpdate() && nonEmptyString(request.resource.data.name, 200)
+        && isCents(request.resource.data.priceCents);
+      allow delete: if false;
+    }
+
+    match /templates/{templateId} {
+      allow read: if isMember();
+      allow create: if canCreate() && nonEmptyString(request.resource.data.name, 200);
+      allow update: if canUpdate() && nonEmptyString(request.resource.data.name, 200);
+      allow delete: if isMember();
+    }
+
+    // ---- Presupuestos ---------------------------------------------------------
+    function validQuote() {
+      let d = request.resource.data;
+      return nonEmptyString(d.title, 200)
+        && d.status in ['borrador', 'enviado', 'aceptado', 'aceptado_parcial', 'rechazado', 'vencido', 'finalizado', 'archivado']
+        && d.version is int && d.version >= 1
+        && d.items is list && d.items.size() <= 200
+        && d.freeLines is list && d.freeLines.size() <= 100
+        && d.adjustments is list && d.adjustments.size() <= 50;
+    }
+
+    match /quotes/{quoteId} {
+      allow read: if isMember();
+      allow create: if canCreate() && validQuote();
+      // Un presupuesto ya enviado no puede volver a borrador (se podría borrar)
+      // ni cambiar de número de versión.
+      allow update: if canUpdate() && validQuote()
+        && (request.resource.data.status != 'borrador' || resource.data.status == 'borrador')
+        && request.resource.data.version == resource.data.version;
+      // Solo se borran borradores; el resto se archiva.
+      allow delete: if isMember() && resource.data.status == 'borrador';
+    }
+
+    // Cualquier otra ruta queda cerrada.
   }
 }
