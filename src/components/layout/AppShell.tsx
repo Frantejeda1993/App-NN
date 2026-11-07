@@ -1,7 +1,8 @@
-import { LogOut } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { LogOut, Settings } from 'lucide-react'
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { useAuth } from '@/auth/AuthProvider'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS } from './nav'
 
@@ -50,11 +51,16 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="flex items-center justify-between gap-2 border-t border-border p-3">
+        <div className="flex items-center justify-between gap-1 border-t border-border p-3">
           <UserBadge />
-          <Button variant="ghost" size="icon" aria-label="Cerrar sesión" onClick={() => void signOut()}>
-            <LogOut />
-          </Button>
+          <div className="flex shrink-0">
+            <Link to="/ajustes" aria-label="Ajustes" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+              <Settings />
+            </Link>
+            <Button variant="ghost" size="icon" aria-label="Cerrar sesión" onClick={() => void signOut()}>
+              <LogOut />
+            </Button>
+          </div>
         </div>
       </aside>
 
@@ -64,10 +70,16 @@ export function AppShell() {
           <span className="font-semibold">
             Taller <span className="text-primary">NN</span>
           </span>
-          <Button variant="ghost" size="icon" aria-label="Cerrar sesión" onClick={() => void signOut()}>
-            <LogOut />
-          </Button>
+          <div className="flex">
+            <Link to="/ajustes" aria-label="Ajustes" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+              <Settings />
+            </Link>
+            <Button variant="ghost" size="icon" aria-label="Cerrar sesión" onClick={() => void signOut()}>
+              <LogOut />
+            </Button>
+          </div>
         </header>
+        <Toaster position="top-center" richColors closeButton />
 
         <main className="flex-1 px-4 pb-24 pt-6 md:px-8 md:pb-8">
           <Outlet />

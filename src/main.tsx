@@ -4,7 +4,9 @@ import { HashRouter } from 'react-router-dom'
 import { AppRoutes } from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import { createFirebaseAuthService } from './auth/firebaseAuthService'
-import { missingFirebaseEnv } from './lib/firebase'
+import { DataProvider } from './data/DataProvider'
+import { createFirestoreDataApi } from './data/firestoreApi'
+import { getFirebase, missingFirebaseEnv } from './lib/firebase'
 import './index.css'
 
 const root = createRoot(document.getElementById('root')!)
@@ -18,13 +20,16 @@ if (missingFirebaseEnv.length > 0) {
   )
 } else {
   const authService = createFirebaseAuthService()
+  const dataApi = createFirestoreDataApi(getFirebase().db)
   root.render(
     <StrictMode>
       <AuthProvider service={authService}>
-        {/* HashRouter: GitHub Pages no sabe resolver rutas de una SPA. */}
-        <HashRouter>
-          <AppRoutes />
-        </HashRouter>
+        <DataProvider api={dataApi}>
+          {/* HashRouter: GitHub Pages no sabe resolver rutas de una SPA. */}
+          <HashRouter>
+            <AppRoutes />
+          </HashRouter>
+        </DataProvider>
       </AuthProvider>
     </StrictMode>,
   )

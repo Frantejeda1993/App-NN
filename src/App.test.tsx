@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { AppRoutes } from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import type { AuthService, AuthUser } from './auth/types'
+import { DataProvider } from './data/DataProvider'
+import { FakeDataApi } from './test/fakeApi'
 
 function setup(members: string[], path = '/') {
   let listener: ((u: AuthUser | null) => void) | null = null
@@ -19,9 +21,11 @@ function setup(members: string[], path = '/') {
   }
   render(
     <AuthProvider service={svc}>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <DataProvider api={new FakeDataApi()}>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </DataProvider>
     </AuthProvider>,
   )
   return { svc, emit: (u: AuthUser | null) => listener?.(u) }
