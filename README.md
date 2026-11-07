@@ -15,7 +15,8 @@ npm run dev
 
 | Script | Qué hace |
 |---|---|
-| `npm run dev` | Servidor de desarrollo |
+| `npm run dev` | Servidor de desarrollo (usa tu Firebase real vía `.env.local`) |
+| `npm run dev:emulators` | Desarrollo **sin tocar datos reales**: levanta los emuladores de Auth y Firestore con datos de prueba en `http://localhost:5174`. Al tocar "Entrar con Google" pide un email de prueba (`dev@taller.test` ya es socio). Requiere Java 21+ |
 | `npm test` | Tests unitarios y de componentes (Vitest) |
 | `npm run coverage` | Tests con cobertura |
 | `npm run test:rules` | Tests de `firestore.rules` contra el emulador (requiere Java 21+) |

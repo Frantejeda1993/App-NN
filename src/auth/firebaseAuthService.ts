@@ -1,11 +1,12 @@
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithPopup,
   signOut as fbSignOut,
 } from 'firebase/auth'
 import { clearIndexedDbPersistence, doc, getDoc, terminate } from 'firebase/firestore'
-import { getFirebase } from '@/lib/firebase'
+import { getFirebase, useEmulators } from '@/lib/firebase'
 import { isActiveMember, memberKey } from './membership'
 import type { AuthService, MemberDoc } from './types'
 
@@ -21,6 +22,15 @@ export function createFirebaseAuthService(): AuthService {
       )
     },
     async signIn() {
+      if (useEmulators) {
+        // Solo desarrollo local: el emulador acepta un token de Google sin firmar,
+        // así se puede entrar sin popup (que algunos navegadores embebidos no abren).
+        const email = window.prompt('Email de prueba (emulador)', 'dev@taller.test')
+        if (!email) return
+        const token = JSON.stringify({ sub: email, email, email_verified: true })
+        await signInWithCredential(auth, GoogleAuthProvider.credential(token))
+        return
+      }
       await signInWithPopup(auth, provider)
     },
     async signOut(options) {

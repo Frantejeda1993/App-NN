@@ -1,6 +1,7 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getAuth, type Auth } from 'firebase/auth'
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth'
 import {
+  connectFirestoreEmulator,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -28,6 +29,9 @@ export const missingFirebaseEnv: string[] = Object.entries({
   .filter(([, v]) => !v)
   .map(([k]) => k)
 
+// Nunca en producción: el build de Pages no define esta variable.
+export const useEmulators = import.meta.env.DEV && env.VITE_USE_EMULATORS === 'true'
+
 let app: FirebaseApp | undefined
 let auth: Auth | undefined
 let db: Firestore | undefined
@@ -36,6 +40,8 @@ export function getFirebase(): { app: FirebaseApp; auth: Auth; db: Firestore } {
   if (!app || !auth || !db) {
     app = initializeApp(config)
     auth = getAuth(app)
+    // Solo en desarrollo local (`npm run dev:emulators`): nada sale a Firebase real.
+    if (useEmulators) connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
     // Caché persistente en IndexedDB: la app funciona sin conexión con los
     // datos ya vistos y sincroniza al volver la red (varias pestañas a la vez).
     db = initializeFirestore(app, {
@@ -43,6 +49,7 @@ export function getFirebase(): { app: FirebaseApp; auth: Auth; db: Firestore } {
       // Los campos opcionales sin valor se omiten en lugar de fallar.
       ignoreUndefinedProperties: true,
     })
+    if (useEmulators) connectFirestoreEmulator(db, '127.0.0.1', 8080)
   }
   return { app, auth, db }
 }
