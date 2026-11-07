@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers ----------------------------------------------------------
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+
+    // Id del documento en members/: email en minúsculas.
+    function emailKey() {
+      return request.auth.token.email.lower();
+    }
+
+    function memberPath() {
+      return /databases/$(database)/documents/members/$(emailKey());
+    }
+
+    // Socio = documento members/{email} existente con active == true.
+    function isMember() {
+      return signedIn()
+        && exists(memberPath())
+        && get(memberPath()).data.active == true;
+    }
+
+    // ---- Lista blanca -----------------------------------------------------
+    // Los socios se dan de alta desde la consola de Firebase (nunca desde la app).
+    match /members/{email} {
+      // Cada usuario puede consultar SOLO su propio documento (para saber si tiene acceso).
+      allow get: if signedIn() && email == emailKey();
+      // Nadie lista la colección completa (expondría los emails de todos los socios).
+      allow list: if false;
+      allow write: if false;
+    }
+
+    // Todo lo demás queda cerrado hasta que el paso 2 defina cada colección.
+  }
+}
