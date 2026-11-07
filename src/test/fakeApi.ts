@@ -2,12 +2,23 @@ import { Timestamp } from 'firebase/firestore'
 import {
   ClientDataSchema,
   ContactDataSchema,
+  ProjectDataSchema,
   WorkshopSettingsSchema,
   type ClientData,
   type ContactData,
+  type ProjectData,
   type WorkshopSettings,
 } from '@/model'
-import { byDateDesc, byName, type Client, type Contact, type DataApi, type Member } from '@/data/api'
+import {
+  byCreatedDesc,
+  byDateDesc,
+  byName,
+  type Client,
+  type Contact,
+  type DataApi,
+  type Member,
+  type Project,
+} from '@/data/api'
 import type { WriteResult } from '@/data/repo'
 
 type Listener = () => void
@@ -113,6 +124,37 @@ export class FakeDataApi implements DataApi {
     const prev = this.clients.get(client.id)!
     const last = prev.lastContactAt && prev.lastContactAt > data.date ? prev.lastContactAt : data.date
     this.clients.set(client.id, { ...prev, lastContactAt: last, nextContactAt, ...this.stamp(by, prev) })
+    return this.done(id)
+  }
+
+  // ---- proyectos ----
+  projects = new Map<string, Project>()
+
+  seedProject(data: Partial<ProjectData> & { title: string; clientId: string; shares: Record<string, number> }, id = `p${++this.seq}`): Project {
+    const pr: Project = { ...ProjectDataSchema.parse(data), ...this.stamp('nacho@gmail.com'), id }
+    this.projects.set(id, pr)
+    this.emit()
+    return pr
+  }
+
+  watchProjects(cb: (p: Project[]) => void) {
+    return this.watch(() => cb([...this.projects.values()].sort(byCreatedDesc)))
+  }
+
+  watchProject(id: string, cb: (p: Project | null) => void) {
+    return this.watch(() => cb(this.projects.get(id) ?? null))
+  }
+
+  createProject(input: unknown, by: string) {
+    const id = `p${++this.seq}`
+    this.projects.set(id, { ...ProjectDataSchema.parse(input), ...this.stamp(by), id })
+    return this.done(id)
+  }
+
+  updateProject(id: string, next: ProjectData, by: string) {
+    const prev = this.projects.get(id)
+    if (!prev) throw new Error('no existe')
+    this.projects.set(id, { ...ProjectDataSchema.parse(next), ...this.stamp(by, prev), id })
     return this.done(id)
   }
 

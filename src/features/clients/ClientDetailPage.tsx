@@ -1,10 +1,11 @@
-import { ArrowLeft, Mail, MapPin, MessageCircle, Pencil, Phone } from 'lucide-react'
+import { ArrowLeft, Mail, MapPin, MessageCircle, Pencil, Phone, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge, Card } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
-import { useClient, useContacts, useMembers, useWorkshopSettings } from '@/data/hooks'
+import { useClient, useContacts, useMembers, useProjects, useWorkshopSettings } from '@/data/hooks'
+import { STATUS_LABELS, STATUS_TONES } from '@/features/projects/labels'
 import { whatsappLink } from '@/domain/clients'
 import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
 import { notifyError, notifyWrite } from '@/lib/notify'
@@ -22,8 +23,14 @@ export function ClientDetailPage() {
   const contacts = useContacts(id)
   const members = useMembers()
   const settings = useWorkshopSettings()
-  const [editing, setEditing] = useState(false)
+  const allProjects = useProjects()
+  // Versión del cliente al empezar a editar (para no pisar cambios de otro socio).
+  const [editingSince, setEditingSince] = useState<number | null>(null)
+  const editing = editingSince !== null
   const today = todayIso()
+
+  const projects = useMemo(() => (allProjects ?? []).filter((p) => p.clientId === id), [allProjects, id])
+  const projectTitle = useMemo(() => new Map(projects.map((p) => [p.id, p.title])), [projects])
 
   const memberName = useMemo(() => {
     const map = new Map((members ?? []).map((m) => [m.email, m.name]))
@@ -43,6 +50,7 @@ export function ClientDetailPage() {
   }
 
   const wa = whatsappLink(client.phone)
+  const version = client.updatedAt?.toMillis?.() ?? 0
 
   return (
     <section className="flex max-w-4xl flex-col gap-4">
@@ -66,7 +74,7 @@ export function ClientDetailPage() {
             </a>
           )}
           {!editing && (
-            <Button variant="outline" onClick={() => setEditing(true)}>
+            <Button variant="outline" onClick={() => setEditingSince(version)}>
               <Pencil /> Editar
             </Button>
           )}
@@ -78,13 +86,19 @@ export function ClientDetailPage() {
           <ClientForm
             initial={client}
             submitLabel="Guardar cambios"
-            onCancel={() => setEditing(false)}
+            onCancel={() => setEditingSince(null)}
             onSubmit={(values) => {
+              if (version !== editingSince) {
+                notifyError(
+                  new Error('Este cliente cambió mientras editabas (otro socio o un contacto nuevo). Cancelá y volvé a editar.'),
+                )
+                return
+              }
               try {
                 // Se envía el cliente completo para no perder fechas de contacto.
                 const next = ClientDataSchema.parse({ ...client, ...values })
                 notifyWrite(api.updateClient(client.id, next, me), 'Cliente actualizado')
-                setEditing(false)
+                setEditingSince(null)
               } catch (e) {
                 notifyError(e)
               }
@@ -106,6 +120,29 @@ export function ClientDetailPage() {
               </div>
             )}
           </dl>
+        )}
+      </Card>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="font-semibold">Proyectos</h2>
+          <Link to={`/proyectos/nuevo?cliente=${client.id}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+            <Plus /> Nuevo proyecto
+          </Link>
+        </div>
+        {projects.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Este cliente todavía no tiene proyectos.</p>
+        ) : (
+          <ul aria-label="Proyectos del cliente" className="flex flex-col gap-1">
+            {projects.map((p) => (
+              <li key={p.id}>
+                <Link to={`/proyectos/${p.id}`} className="flex items-center justify-between gap-2 rounded px-2 py-1 text-sm hover:bg-muted">
+                  <span className="truncate">{p.title}</span>
+                  <Badge tone={STATUS_TONES[p.status]}>{STATUS_LABELS[p.status]}</Badge>
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
 
@@ -143,6 +180,9 @@ export function ClientDetailPage() {
                 <p className="text-sm">
                   <span className="font-medium">{formatDateEs(k.date)}</span> · {CHANNEL_LABELS[k.channel]} ·{' '}
                   <span className="text-muted-foreground">por {memberName(k.createdBy)}</span>
+                  {k.projectId && projectTitle.has(k.projectId) && (
+                    <span className="text-muted-foreground"> · {projectTitle.get(k.projectId)}</span>
+                  )}
                 </p>
                 {k.note && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{k.note}</p>}
               </li>

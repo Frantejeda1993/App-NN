@@ -12,12 +12,13 @@ import {
   ClientDataSchema,
   ContactDataSchema,
   MemberDataSchema,
+  ProjectDataSchema,
   SETTINGS_DOCS,
   WorkshopSettingsSchema,
   type AuditFields,
   type Stored,
 } from '@/model'
-import { byDateDesc, byName, type DataApi } from './api'
+import { byCreatedDesc, byDateDesc, byName, type DataApi } from './api'
 import { addContact, createDocument, updateDocument } from './repo'
 
 /**
@@ -103,7 +104,10 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
       return onSnapshot(
         doc(db, COLLECTIONS.settings, SETTINGS_DOCS.workshop),
         (snap) => {
-          const parsed = WorkshopSettingsSchema.safeParse(snap.data() ?? {})
+          const raw = snap.data() ?? {}
+          let parsed = WorkshopSettingsSchema.safeParse(raw)
+          // Un reparto por defecto inválido no debe borrar el resto de los ajustes.
+          if (!parsed.success) parsed = WorkshopSettingsSchema.safeParse({ ...raw, defaultShares: null })
           cb({
             settings: parsed.success ? parsed.data : WorkshopSettingsSchema.parse({}),
             exists: snap.exists(),
@@ -111,6 +115,29 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
         },
         onError('ajustes'),
       )
+    },
+
+    watchProjects(cb) {
+      return onSnapshot(
+        collection(db, COLLECTIONS.projects),
+        (snap) => {
+          const list = snap.docs.map((d) => toStored(ProjectDataSchema, d)).filter((p) => p !== null)
+          cb(list.sort(byCreatedDesc))
+        },
+        onError('proyectos'),
+      )
+    },
+
+    watchProject(id, cb) {
+      return onSnapshot(doc(db, COLLECTIONS.projects, id), (snap) => cb(toStored(ProjectDataSchema, snap)), onError('proyecto'))
+    },
+
+    createProject(input, by) {
+      return createDocument(db, COLLECTIONS.projects, ProjectDataSchema, input, by)
+    },
+
+    updateProject(id, next, by) {
+      return updateDocument(db, COLLECTIONS.projects, id, ProjectDataSchema, next, by)
     },
 
     createClient(input, by) {

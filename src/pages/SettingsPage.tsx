@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card, Field, Input } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
-import { useWorkshopSettings } from '@/data/hooks'
+import { useMembers, useWorkshopSettings } from '@/data/hooks'
+import { bpMapToPercentInputs, defaultSharesFor, parsePercentInputs } from '@/domain/projects'
+import { SharesEditor } from '@/features/projects/SharesEditor'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { WorkshopSettingsSchema } from '@/model'
 
@@ -70,6 +72,69 @@ export function SettingsPage() {
           </div>
         </form>
       </Card>
+      <DefaultSharesCard key={state.exists ? 'saved' : 'new'} />
     </section>
+  )
+}
+
+/** Reparto con el que arranca cada proyecto nuevo (se puede cambiar por proyecto). */
+function DefaultSharesCard() {
+  const api = useData()
+  const me = useMyEmail()
+  const state = useWorkshopSettings()
+  const members = useMembers()
+  // Se inicializa una sola vez con lo guardado; después es del usuario.
+  const [value, setValue] = useState<Record<string, string> | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!state || !members) return null
+  const effective = defaultSharesFor(members, state.settings.defaultShares)
+  const current = value ?? bpMapToPercentInputs(effective)
+  // El guardado menciona a un socio que ya no está activo: se usa partes iguales.
+  const discarded =
+    state.settings.defaultShares !== null && JSON.stringify(effective) !== JSON.stringify(state.settings.defaultShares)
+
+  return (
+    <Card>
+      <h2 className="mb-1 font-semibold">Reparto por defecto de los proyectos</h2>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Con esta participación arranca cada proyecto nuevo. Después se puede cambiar en cada uno.
+      </p>
+      {discarded && (
+        <p role="note" className="mb-3 rounded-md bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-300">
+          El reparto guardado incluía a un socio que ya no está activo, así que se usa partes iguales. Revisalo y guardalo de
+          nuevo.
+        </p>
+      )}
+      <SharesEditor idPrefix="default-share" members={members} value={current} onChange={setValue} />
+      {error && (
+        <p role="alert" className="mt-1 text-sm text-destructive">
+          No se puede guardar: {error}
+        </p>
+      )}
+      <Button
+        className="mt-3"
+        disabled={value === null}
+        onClick={() => {
+          const parsed = parsePercentInputs(current)
+          if (!parsed.ok) {
+            setError(parsed.error)
+            return
+          }
+          setError(null)
+          try {
+            notifyWrite(
+              api.saveWorkshopSettings({ ...state.settings, defaultShares: parsed.shares }, state.exists, me),
+              'Reparto por defecto guardado',
+            )
+            setValue(null)
+          } catch (e) {
+            notifyError(e)
+          }
+        }}
+      >
+        Guardar reparto
+      </Button>
+    </Card>
   )
 }

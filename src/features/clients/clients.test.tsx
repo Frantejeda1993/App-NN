@@ -178,7 +178,7 @@ describe('alertas en Inicio y ajustes', () => {
     const input = await screen.findByLabelText(/más de n días/i)
     await userEvent.clear(input)
     await userEvent.type(input, '7')
-    await userEvent.click(screen.getByRole('button', { name: /guardar/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^guardar$/i }))
     await waitFor(() => expect(api.settings.contactAlertDays).toBe(7))
     unmount()
 

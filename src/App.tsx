@@ -5,6 +5,9 @@ import { AppShell } from '@/components/layout/AppShell'
 import { ClientDetailPage } from '@/features/clients/ClientDetailPage'
 import { ClientNewPage } from '@/features/clients/ClientNewPage'
 import { ClientsListPage } from '@/features/clients/ClientsListPage'
+import { ProjectDetailPage } from '@/features/projects/ProjectDetailPage'
+import { ProjectNewPage } from '@/features/projects/ProjectNewPage'
+import { ProjectsListPage } from '@/features/projects/ProjectsListPage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -30,7 +33,9 @@ export function AppRoutes() {
         <Route path="clientes" element={<ClientsListPage />} />
         <Route path="clientes/nuevo" element={<ClientNewPage />} />
         <Route path="clientes/:id" element={<ClientDetailPage />} />
-        <Route path="proyectos" element={<ComingSoonPage title="Proyectos" />} />
+        <Route path="proyectos" element={<ProjectsListPage />} />
+        <Route path="proyectos/nuevo" element={<ProjectNewPage />} />
+        <Route path="proyectos/:id" element={<ProjectDetailPage />} />
         <Route path="billetera" element={<ComingSoonPage title="Billetera" />} />
         <Route path="presupuestos" element={<ComingSoonPage title="Presupuestos" />} />
         <Route path="ajustes" element={<SettingsPage />} />

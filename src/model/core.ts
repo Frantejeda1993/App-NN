@@ -32,6 +32,8 @@ export const WorkshopSettingsSchema = z.object({
   quoteValidityDays: z.number().int().min(1).max(365).default(15),
   /** Alerta si un cliente activo lleva más de N días sin contacto. */
   contactAlertDays: z.number().int().min(1).max(365).default(14),
+  /** Participación con la que arranca un proyecto nuevo; null = partes iguales. */
+  defaultShares: SharesSchema.nullable().default(null),
 })
 export type WorkshopSettings = z.infer<typeof WorkshopSettingsSchema>
 

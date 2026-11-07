@@ -1,0 +1,241 @@
+import { ArrowLeft, FileText, MessageCircle, Pencil, Wallet } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Badge, Card, Select } from '@/components/ui/form'
+import { useData, useMyEmail } from '@/data/DataProvider'
+import { useClient, useClients, useMembers } from '@/data/hooks'
+import { whatsappLink } from '@/domain/clients'
+import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
+import { formatEuros } from '@/domain/money'
+import { WORKSHOP_SHARE_KEY, formatPercent } from '@/domain/percent'
+import { isDeliveryOverdue } from '@/domain/projects'
+import { ContactForm } from '@/features/clients/ContactForm'
+import { notifyError, notifyWrite } from '@/lib/notify'
+import { PROJECT_STATUSES, ProjectDataSchema, type ProjectData, type ProjectStatus } from '@/model'
+import { useProject } from '@/data/hooks'
+import { ProjectForm } from './ProjectForm'
+import { STATUS_LABELS, STATUS_TONES, WORKSHOP_LABEL } from './labels'
+
+export function ProjectDetailPage() {
+  const { id = '' } = useParams()
+  const api = useData()
+  const me = useMyEmail()
+  const project = useProject(id)
+  const client = useClient(project?.clientId ?? '')
+  const clients = useClients()
+  const members = useMembers()
+  // Versión del proyecto al empezar a editar: si otro socio lo cambia mientras
+  // tanto, no se pisa su cambio sin avisar.
+  const [editingSince, setEditingSince] = useState<number | null>(null)
+  const editing = editingSince !== null
+  const today = todayIso()
+
+  if (project === undefined) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (project === null) {
+    return (
+      <section className="flex flex-col gap-3">
+        <p>No se encontró el proyecto.</p>
+        <Link to="/proyectos" className="text-primary underline">
+          Volver a proyectos
+        </Link>
+      </section>
+    )
+  }
+
+  const save = (patch: Partial<ProjectData>, message: string) => {
+    try {
+      const next = ProjectDataSchema.parse({ ...project, ...patch })
+      notifyWrite(api.updateProject(project.id, next, me), message)
+      return true
+    } catch (e) {
+      notifyError(e)
+      return false
+    }
+  }
+
+  const changeStatus = (status: ProjectStatus) => {
+    // Al marcarlo entregado se completa la fecha de entrega real si faltaba; si
+    // vuelve a pendiente / en proceso, deja de estar entregado.
+    let deliveredAt = project.deliveredAt
+    if (status === 'entregado' && !deliveredAt) deliveredAt = today
+    if (status === 'pendiente' || status === 'en_proceso') deliveredAt = null
+    save({ status, deliveredAt }, `Estado: ${STATUS_LABELS[status]}`)
+  }
+
+  const versionOf = (p: { updatedAt: { toMillis(): number } }) => p.updatedAt?.toMillis?.() ?? 0
+
+  const memberName = (email: string) =>
+    email === WORKSHOP_SHARE_KEY ? WORKSHOP_LABEL : (members?.find((m) => m.email === email)?.name ?? email)
+  const wa = client ? whatsappLink(client.phone) : null
+  const overdue = isDeliveryOverdue(project, today)
+
+  return (
+    <section className="flex max-w-4xl flex-col gap-4">
+      <Link to="/proyectos" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="size-4" /> Proyectos
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{project.title}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {client && (
+              <Link to={`/clientes/${client.id}`} className="text-primary hover:underline">
+                {client.name}
+              </Link>
+            )}
+            <Badge tone={STATUS_TONES[project.status]}>{STATUS_LABELS[project.status]}</Badge>
+            {overdue && <Badge tone="danger">Entrega vencida</Badge>}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="project-status" className="sr-only">
+            Cambiar estado
+          </label>
+          <Select
+            id="project-status"
+            className="w-auto"
+            value={project.status}
+            onChange={(e) => changeStatus(e.target.value as ProjectStatus)}
+          >
+            {PROJECT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </Select>
+          {!editing && (
+            <Button variant="outline" onClick={() => setEditingSince(versionOf(project))}>
+              <Pencil /> Editar
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Card>
+        {editing && clients && members ? (
+          <ProjectForm
+            clients={clients}
+            members={members}
+            initial={project}
+            initialShares={project.shares}
+            submitLabel="Guardar cambios"
+            onCancel={() => setEditingSince(null)}
+            onSubmit={(values) => {
+              if (versionOf(project) !== editingSince) {
+                notifyError(
+                  new Error('Otro socio modificó este proyecto mientras editabas. Cancelá y volvé a editar para ver sus cambios.'),
+                )
+                return false
+              }
+              const ok = save(values, 'Proyecto actualizado')
+              if (ok) setEditingSince(null)
+              return ok
+            }}
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            <dl className="grid gap-3 text-sm">
+              {project.summary && (
+                <div>
+                  <dt className="text-muted-foreground">Resumen</dt>
+                  <dd className="whitespace-pre-wrap">{project.summary}</dd>
+                </div>
+              )}
+              <DateRow label="Solicitado" value={project.requestedAt} />
+              <DateRow label="Presupuestado" value={project.quotedAt} />
+              <DateRow label="Entrega comprometida" value={project.promisedDeliveryAt} />
+              <DateRow label="Entregado" value={project.deliveredAt} />
+              <div>
+                <dt className="text-muted-foreground">Gastos estimados</dt>
+                <dd>{project.estimatedCostCents != null ? formatEuros(project.estimatedCostCents) : '—'}</dd>
+              </div>
+              {project.notes && (
+                <div>
+                  <dt className="text-muted-foreground">Notas</dt>
+                  <dd className="whitespace-pre-wrap">{project.notes}</dd>
+                </div>
+              )}
+            </dl>
+            <div>
+              <h2 className="mb-2 text-sm font-medium">Participación en la ganancia</h2>
+              <ul aria-label="Participación" className="flex flex-col gap-1 text-sm">
+                {Object.entries(project.shares)
+                  .sort(([a], [b]) => (a === WORKSHOP_SHARE_KEY ? 1 : b === WORKSHOP_SHARE_KEY ? -1 : 0))
+                  .map(([k, bp]) => (
+                    <li key={k} className="flex justify-between gap-2">
+                      <span>{memberName(k)}</span>
+                      <span className="tabular-nums">{formatPercent(bp)}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {client && (
+        <Card>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Contacto con {client.name}</h2>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {client.lastContactAt ? `Último contacto ${relativeDays(client.lastContactAt, today)}` : 'Sin contactos'}
+              {wa && (
+                <a href={wa} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+                  <MessageCircle /> WhatsApp
+                </a>
+              )}
+            </div>
+          </div>
+          <ContactForm
+            onSubmit={(v) => {
+              try {
+                const res = api.addContact(
+                  client,
+                  { date: v.date, channel: v.channel, note: v.note, projectId: project.id },
+                  v.nextContactAt === '' ? null : v.nextContactAt,
+                  me,
+                )
+                notifyWrite(res, 'Contacto registrado')
+                return true
+              } catch (e) {
+                notifyError(e)
+                return false
+              }
+            }}
+          />
+        </Card>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <h2 className="mb-2 flex items-center gap-2 font-semibold">
+            <FileText className="size-4" aria-hidden /> Presupuestos
+          </h2>
+          <p className="text-sm text-muted-foreground">Los presupuestos vinculados aparecerán acá.</p>
+          <Button className="mt-3" variant="outline" disabled title="Disponible en el paso 9">
+            Crear presupuesto (próximamente)
+          </Button>
+        </Card>
+        <Card>
+          <h2 className="mb-2 flex items-center gap-2 font-semibold">
+            <Wallet className="size-4" aria-hidden /> Cobros y gastos
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Señas, cobros y gastos extra fuera del presupuesto aparecerán acá (próximamente, con la billetera).
+          </p>
+        </Card>
+      </div>
+    </section>
+  )
+}
+
+function DateRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{value ? formatDateEs(value) : '—'}</dd>
+    </div>
+  )
+}

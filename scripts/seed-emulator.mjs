@@ -44,4 +44,17 @@ await put('clients/demo-james/contacts/k1', {
   ...audit, createdBy: 'nahuel@taller.test',
 })
 
+const shares = { [DEV_EMAIL]: 4000, 'nahuel@taller.test': 4000, taller: 2000 }
+const project = (title, clientId, extra) => ({
+  title, clientId, summary: '', status: 'pendiente', requestedAt: iso(-10), quotedAt: null,
+  promisedDeliveryAt: null, deliveredAt: null, shares, notes: '', acceptedQuoteId: null,
+  estimatedCostCents: null, ...extra, ...audit,
+})
+await put('projects/demo-cocina', project('Cocina en L', 'demo-raquel', {
+  status: 'en_proceso', summary: 'Módulos bajo mesada + alacenas, puertas blancas', quotedAt: iso(-8),
+  promisedDeliveryAt: iso(-2), estimatedCostCents: 176050,
+}))
+await put('projects/demo-placard', project('Placard dormitorio', 'demo-abraham', { status: 'cobrado' }))
+await put('projects/demo-bano', project('Mueble de baño', 'demo-james', { promisedDeliveryAt: iso(20) }))
+
 console.log(`Emulador sembrado. Entrá con Google → "Add new account" → ${DEV_EMAIL}`)
