@@ -11,6 +11,8 @@ import {
 import type { z } from 'zod'
 import {
   COLLECTIONS,
+  ContactDataSchema,
+  isoDateSchema,
   MovementBaseSchema,
   MovementControlSchema,
   MovementDataSchema,
@@ -80,6 +82,35 @@ export function updateDocument<S extends z.ZodType>(
 ): WriteResult {
   const data = schema.parse(next) as Record<string, unknown>
   return result(id, updateDoc(doc(db, collectionPath, id), { ...data, ...auditOnUpdate(by) }))
+}
+
+// ---- Contactos con clientes ----------------------------------------------------
+
+/**
+ * Registra un contacto y, en la misma escritura, actualiza en el cliente el
+ * último contacto (si es más reciente) y la próxima fecha a contactar.
+ */
+export function addContact(
+  db: Firestore,
+  client: { id: string; lastContactAt: string | null },
+  input: z.input<typeof ContactDataSchema>,
+  nextContactAt: string | null,
+  by: string,
+): WriteResult {
+  const contact = ContactDataSchema.parse(input)
+  const next = nextContactAt === null ? null : isoDateSchema.parse(nextContactAt)
+  const lastContactAt =
+    client.lastContactAt && client.lastContactAt > contact.date ? client.lastContactAt : contact.date
+
+  const batch = writeBatch(db)
+  const ref = doc(collection(db, COLLECTIONS.clients, client.id, COLLECTIONS.contacts))
+  batch.set(ref, { ...contact, ...auditOnCreate(by) })
+  batch.update(doc(db, COLLECTIONS.clients, client.id), {
+    lastContactAt,
+    nextContactAt: next,
+    ...auditOnUpdate(by),
+  })
+  return result(ref.id, batch.commit())
 }
 
 // ---- Movimientos: siempre con su entrada en auditLog, nunca se borran ---------

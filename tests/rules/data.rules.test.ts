@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  addContact,
   createDocument,
   createMovement,
   deleteMovement,
@@ -163,6 +164,39 @@ describe('auditoría en documentos comunes', () => {
     const db = dbAs(NACHO)
     const shares = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`s${i}@x.com`, 0]))
     await assertFails(setDoc(doc(db, 'projects/px'), { title: 'X', clientId: 'c1', status: 'pendiente', shares, ...stamp(NACHO) }))
+  })
+})
+
+describe('contactos con clientes', () => {
+  it('addContact guarda el contacto y actualiza el cliente en una sola escritura', async () => {
+    const db = dbAs(NACHO)
+    const c = createDocument(db, 'clients', ClientDataSchema, { name: 'James', lastContactAt: '2026-10-01' }, NACHO)
+    await c.committed
+
+    const db2 = dbAs(NAHUEL)
+    const k = addContact(db2, { id: c.id, lastContactAt: '2026-10-01' }, { date: '2026-11-07', channel: 'llamada', note: 'ok' }, '2026-11-14', NAHUEL)
+    await assertSucceeds(k.committed)
+
+    const client = (await getDoc(doc(db2, 'clients', c.id))).data()
+    expect(client).toMatchObject({ lastContactAt: '2026-11-07', nextContactAt: '2026-11-14', updatedBy: NAHUEL, createdBy: NACHO })
+    const contact = (await getDoc(doc(db2, 'clients', c.id, 'contacts', k.id))).data()
+    expect(contact).toMatchObject({ channel: 'llamada', createdBy: NAHUEL })
+  })
+
+  it('un contacto anterior no pisa un último contacto más reciente', async () => {
+    const db = dbAs(NACHO)
+    const c = createDocument(db, 'clients', ClientDataSchema, { name: 'James', lastContactAt: '2026-11-07' }, NACHO)
+    await c.committed
+    await addContact(db, { id: c.id, lastContactAt: '2026-11-07' }, { date: '2026-10-01', channel: 'email' }, null, NACHO).committed
+    expect((await getDoc(doc(db, 'clients', c.id))).data()).toMatchObject({ lastContactAt: '2026-11-07', nextContactAt: null })
+  })
+
+  it('un no socio no puede registrar contactos', async () => {
+    const db = dbAs(NACHO)
+    const c = createDocument(db, 'clients', ClientDataSchema, { name: 'James' }, NACHO)
+    await c.committed
+    const intruso = 'extrano@gmail.com'
+    await assertFails(addContact(dbAs(intruso), { id: c.id, lastContactAt: null }, { date: '2026-11-07', channel: 'otro' }, null, intruso).committed)
   })
 })
 

@@ -44,6 +44,8 @@ export const ClientDataSchema = z.object({
   /** De dónde llegó: Wallapop, recomendación, Instagram… */
   source: z.string().max(100).default(''),
   notes: textSchema,
+  /** Seguimiento activo: si está apagado no genera alertas de contacto. */
+  followUp: z.boolean().default(true),
   /** Fecha del último contacto (se actualiza al registrar uno). */
   lastContactAt: nullableIsoDate,
   /** Próxima fecha a contactar (alerta). */
