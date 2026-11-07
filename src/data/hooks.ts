@@ -1,4 +1,20 @@
-import type { AuditEntry, Box, Client, Contact, GeneralExpense, Member, Movement, Project, Quote, SettingsState } from './api'
+import type {
+  AuditEntry,
+  Box,
+  Client,
+  Contact,
+  EdgeBanding,
+  GeneralExpense,
+  Hardware,
+  Material,
+  Member,
+  Movement,
+  Project,
+  Quote,
+  ServiceRatesState,
+  SettingsState,
+  Template,
+} from './api'
 import { useData, useLive } from './DataProvider'
 
 /** Hooks tipados de lectura en tiempo real. `undefined` = cargando. */
@@ -42,6 +58,31 @@ export function useProject(id: string): Project | null | undefined {
 export function useBoxes(): Box[] | undefined {
   const api = useData()
   return useLive<Box[]>((cb) => api.watchBoxes(cb), [])
+}
+
+export function useMaterials(): Material[] | undefined {
+  const api = useData()
+  return useLive<Material[]>((cb) => api.watchMaterials(cb), [])
+}
+
+export function useEdgeBanding(): EdgeBanding[] | undefined {
+  const api = useData()
+  return useLive<EdgeBanding[]>((cb) => api.watchEdgeBanding(cb), [])
+}
+
+export function useHardware(): Hardware[] | undefined {
+  const api = useData()
+  return useLive<Hardware[]>((cb) => api.watchHardware(cb), [])
+}
+
+export function useTemplates(): Template[] | undefined {
+  const api = useData()
+  return useLive<Template[]>((cb) => api.watchTemplates(cb), [])
+}
+
+export function useServiceRates(): ServiceRatesState | undefined {
+  const api = useData()
+  return useLive<ServiceRatesState>((cb) => api.watchServiceRates(cb), [])
 }
 
 export function useQuotes(): Quote[] | undefined {

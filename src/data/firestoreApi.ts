@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   query,
@@ -14,6 +15,11 @@ import {
   ClientDataSchema,
   ContactDataSchema,
   BoxDataSchema,
+  EdgeBandingDataSchema,
+  HardwareDataSchema,
+  MaterialDataSchema,
+  ServiceRatesSchema,
+  TemplateDataSchema,
   GeneralExpenseDataSchema,
   MemberDataSchema,
   MovementBaseSchema,
@@ -64,6 +70,24 @@ const onError = (what: string) => (err: Error) => {
       ? `Sin acceso a ${what}. Si te desactivaron como socio, pedí que te vuelvan a habilitar.`
       : `No se pudieron cargar ${what}. Revisá la conexión y recargá.`,
     { id: `read-error-${what}` },
+  )
+}
+
+/** Colección completa en tiempo real, validada y ordenada por nombre. */
+function watchList<S extends z.ZodType>(
+  db: Firestore,
+  path: string,
+  schema: S,
+  what: string,
+  cb: (items: Stored<z.output<S>>[]) => void,
+) {
+  return onSnapshot(
+    collection(db, path),
+    (snap) => {
+      const list = snap.docs.map((d) => toStored(schema, d)).filter((x) => x !== null)
+      cb(list.sort((a, b) => byName(a as unknown as { name: string }, b as unknown as { name: string })))
+    },
+    onError(what),
   )
 }
 
@@ -254,6 +278,41 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
 
     addContact(client, input, nextContactAt, by) {
       return addContact(db, client, input, nextContactAt, by)
+    },
+
+    watchMaterials: (cb) => watchList(db, COLLECTIONS.materials, MaterialDataSchema, 'materiales', cb),
+    createMaterial: (input, by) => createDocument(db, COLLECTIONS.materials, MaterialDataSchema, input, by),
+    updateMaterial: (id, next, by) => updateDocument(db, COLLECTIONS.materials, id, MaterialDataSchema, next, by),
+    watchEdgeBanding: (cb) => watchList(db, COLLECTIONS.edgeBanding, EdgeBandingDataSchema, 'cantos', cb),
+    createEdgeBanding: (input, by) => createDocument(db, COLLECTIONS.edgeBanding, EdgeBandingDataSchema, input, by),
+    updateEdgeBanding: (id, next, by) => updateDocument(db, COLLECTIONS.edgeBanding, id, EdgeBandingDataSchema, next, by),
+    watchHardware: (cb) => watchList(db, COLLECTIONS.hardware, HardwareDataSchema, 'herrajes', cb),
+    createHardware: (input, by) => createDocument(db, COLLECTIONS.hardware, HardwareDataSchema, input, by),
+    updateHardware: (id, next, by) => updateDocument(db, COLLECTIONS.hardware, id, HardwareDataSchema, next, by),
+    watchTemplates: (cb) => watchList(db, COLLECTIONS.templates, TemplateDataSchema, 'plantillas', cb),
+    createTemplate: (input, by) => createDocument(db, COLLECTIONS.templates, TemplateDataSchema, input, by),
+    updateTemplate: (id, next, by) => updateDocument(db, COLLECTIONS.templates, id, TemplateDataSchema, next, by),
+    deleteTemplate(id) {
+      const committed = deleteDoc(doc(db, COLLECTIONS.templates, id))
+      committed.catch(() => {})
+      return { id, committed }
+    },
+
+    watchServiceRates(cb) {
+      return onSnapshot(
+        doc(db, COLLECTIONS.settings, SETTINGS_DOCS.services),
+        (snap) => {
+          const parsed = ServiceRatesSchema.safeParse(snap.data() ?? {})
+          cb({ rates: parsed.success ? parsed.data : ServiceRatesSchema.parse({}), exists: snap.exists() })
+        },
+        onError('tarifas'),
+      )
+    },
+
+    saveServiceRates(next, exists, by) {
+      return exists
+        ? updateDocument(db, COLLECTIONS.settings, SETTINGS_DOCS.services, ServiceRatesSchema, next, by)
+        : createDocument(db, COLLECTIONS.settings, ServiceRatesSchema, next, by, SETTINGS_DOCS.services)
     },
 
     saveWorkshopSettings(next, exists, by) {

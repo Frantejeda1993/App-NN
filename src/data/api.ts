@@ -6,6 +6,15 @@ import type {
   ClientDataSchema,
   ContactData,
   ContactDataSchema,
+  EdgeBandingData,
+  EdgeBandingDataSchema,
+  HardwareData,
+  HardwareDataSchema,
+  MaterialData,
+  MaterialDataSchema,
+  ServiceRates,
+  TemplateData,
+  TemplateDataSchema,
   GeneralExpenseData,
   GeneralExpenseDataSchema,
   MovementControl,
@@ -44,6 +53,16 @@ export interface Member {
   email: string
   name: string
   active: boolean
+}
+
+export type Material = Stored<MaterialData>
+export type EdgeBanding = Stored<EdgeBandingData>
+export type Hardware = Stored<HardwareData>
+export type Template = Stored<TemplateData>
+
+export interface ServiceRatesState {
+  rates: ServiceRates
+  exists: boolean
 }
 
 export interface SettingsState {
@@ -98,6 +117,25 @@ export interface DataApi {
     by: string,
   ): WriteResult
   saveWorkshopSettings(next: WorkshopSettings, exists: boolean, by: string): WriteResult
+
+  // ---- catálogo (no se borra: se desactiva) ----
+  watchMaterials(cb: (items: Material[]) => void): Unsubscribe
+  createMaterial(input: z.input<typeof MaterialDataSchema>, by: string): WriteResult
+  updateMaterial(id: string, next: MaterialData, by: string): WriteResult
+  watchEdgeBanding(cb: (items: EdgeBanding[]) => void): Unsubscribe
+  createEdgeBanding(input: z.input<typeof EdgeBandingDataSchema>, by: string): WriteResult
+  updateEdgeBanding(id: string, next: EdgeBandingData, by: string): WriteResult
+  watchHardware(cb: (items: Hardware[]) => void): Unsubscribe
+  createHardware(input: z.input<typeof HardwareDataSchema>, by: string): WriteResult
+  updateHardware(id: string, next: HardwareData, by: string): WriteResult
+  watchServiceRates(cb: (state: ServiceRatesState) => void): Unsubscribe
+  saveServiceRates(next: ServiceRates, exists: boolean, by: string): WriteResult
+
+  // ---- plantillas de mueble ----
+  watchTemplates(cb: (items: Template[]) => void): Unsubscribe
+  createTemplate(input: z.input<typeof TemplateDataSchema>, by: string): WriteResult
+  updateTemplate(id: string, next: TemplateData, by: string): WriteResult
+  deleteTemplate(id: string): WriteResult
 }
 
 /** Orden alfabético en español, sin distinguir tildes ni mayúsculas. */

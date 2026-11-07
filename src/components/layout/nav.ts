@@ -1,4 +1,4 @@
-import { FileText, FolderKanban, Home, Users, Wallet, type LucideIcon } from 'lucide-react'
+import { FileText, FolderKanban, Home, Package, Users, Wallet, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -12,4 +12,5 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/proyectos', label: 'Proyectos', icon: FolderKanban },
   { to: '/billetera', label: 'Billetera', icon: Wallet },
   { to: '/presupuestos', label: 'Presupuestos', icon: FileText },
+  { to: '/catalogo', label: 'Catálogo', icon: Package },
 ]

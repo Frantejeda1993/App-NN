@@ -30,7 +30,15 @@ import {
   updateMovement,
   type StoredMovement,
 } from '@/data/repo'
-import { ClientDataSchema, GeneralExpenseDataSchema, MovementDataSchema, ProjectDataSchema, QuoteDataSchema } from '@/model'
+import {
+  ClientDataSchema,
+  GeneralExpenseDataSchema,
+  MaterialDataSchema,
+  MovementDataSchema,
+  ProjectDataSchema,
+  QuoteDataSchema,
+  TemplateDataSchema,
+} from '@/model'
 
 let env: RulesTestEnvironment
 
@@ -197,6 +205,33 @@ describe('proyectos', () => {
     const huge = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`s${i}@x.com`, 0]))
     await assertFails(setDoc(doc(db, 'settings/workshop'), { name: 'T', defaultShares: huge, ...stamp(NACHO) }))
     await assertFails(setDoc(doc(db, 'settings/workshop'), { name: 'T', defaultShares: 'basura', ...stamp(NACHO) }))
+  })
+})
+
+describe('catálogo y plantillas', () => {
+  it('los socios crean y editan catálogo; no se borra; las plantillas sí', async () => {
+    const db = dbAs(NACHO)
+    const mat = createDocument(
+      db,
+      'catalogMaterials',
+      MaterialDataSchema,
+      { name: 'Melamina', sheetWidthMm: 2850, sheetHeightMm: 2100, thicknessMm: 19, sheetPriceCents: 12389 },
+      NACHO,
+    )
+    await assertSucceeds(mat.committed)
+    await assertFails(deleteDoc(doc(db, 'catalogMaterials', mat.id)))
+    await assertSucceeds(setDoc(doc(db, 'settings/services'), { cutAndEdgePerM2Cents: 1600, ...stamp(NACHO) }))
+
+    const tpl = createDocument(
+      db,
+      'templates',
+      TemplateDataSchema,
+      { name: 'Bajo mesada', item: { name: 'Bajo mesada', widthMm: 600, heightMm: 720, depthMm: 560 } },
+      NACHO,
+    )
+    await assertSucceeds(tpl.committed)
+    await assertSucceeds(deleteDoc(doc(dbAs(NAHUEL), 'templates', tpl.id)))
+    await assertFails(getDoc(doc(dbAs('extrano@gmail.com'), 'catalogMaterials', mat.id)))
   })
 })
 

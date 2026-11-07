@@ -2,6 +2,8 @@ import { Loader2 } from 'lucide-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/auth/AuthProvider'
 import { AppShell } from '@/components/layout/AppShell'
+import { CatalogPage } from '@/features/catalog/CatalogPage'
+import { TemplateEditorPage } from '@/features/catalog/TemplateEditorPage'
 import { ClientDetailPage } from '@/features/clients/ClientDetailPage'
 import { ClientNewPage } from '@/features/clients/ClientNewPage'
 import { ClientsListPage } from '@/features/clients/ClientsListPage'
@@ -46,6 +48,9 @@ export function AppRoutes() {
         <Route path="billetera/gastos/nuevo" element={<GeneralExpenseFormPage />} />
         <Route path="billetera/gastos/:id" element={<GeneralExpenseFormPage />} />
         <Route path="presupuestos" element={<ComingSoonPage title="Presupuestos" />} />
+        <Route path="catalogo" element={<CatalogPage />} />
+        <Route path="catalogo/plantillas/nueva" element={<TemplateEditorPage />} />
+        <Route path="catalogo/plantillas/:id" element={<TemplateEditorPage />} />
         <Route path="ajustes" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

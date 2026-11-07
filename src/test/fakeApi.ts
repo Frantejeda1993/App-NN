@@ -8,6 +8,17 @@ import {
   type GeneralExpenseData,
   ProjectDataSchema,
   QuoteDataSchema,
+  EdgeBandingDataSchema,
+  HardwareDataSchema,
+  MaterialDataSchema,
+  ServiceRatesSchema,
+  TemplateDataSchema,
+  type EdgeBandingData,
+  type HardwareData,
+  type MaterialData,
+  type ServiceRates,
+  type Stored,
+  type TemplateData,
   type BoxData,
   type MovementData,
   WorkshopSettingsSchema,
@@ -31,6 +42,10 @@ import {
   type Member,
   type Project,
   type Quote,
+  type EdgeBanding,
+  type Hardware,
+  type Material,
+  type Template,
 } from '@/data/api'
 import type { WriteResult } from '@/data/repo'
 
@@ -287,6 +302,62 @@ export class FakeDataApi implements DataApi {
 
   deleteMovement(current: Movement, reason: string, by: string) {
     return this.writeVersion(current, { ...current, deleted: true, deletedReason: reason, version: current.version + 1 }, 'delete', by)
+  }
+
+  // ---- catálogo y plantillas ----
+  materials = new Map<string, Material>()
+  edgeBanding = new Map<string, EdgeBanding>()
+  hardware = new Map<string, Hardware>()
+  templates = new Map<string, Template>()
+  serviceRates: ServiceRates = ServiceRatesSchema.parse({})
+  serviceRatesExist = false
+
+  private crud<T extends { name: string }>(map: Map<string, Stored<T>>, schema: { parse(x: unknown): T }, prefix: string) {
+    return {
+      watch: (cb: (items: Stored<T>[]) => void) => this.watch(() => cb([...map.values()].sort(byName))),
+      create: (input: unknown, by: string) => {
+        const id = `${prefix}${++this.seq}`
+        map.set(id, { ...schema.parse(input), ...this.stamp(by), id } as Stored<T>)
+        return this.done(id)
+      },
+      update: (id: string, next: T, by: string) => {
+        const prev = map.get(id)!
+        map.set(id, { ...schema.parse(next), ...this.stamp(by, prev), id } as Stored<T>)
+        return this.done(id)
+      },
+    }
+  }
+
+  private mat = this.crud(this.materials, MaterialDataSchema, 'mat')
+  private edge = this.crud(this.edgeBanding, EdgeBandingDataSchema, 'edge')
+  private hw = this.crud(this.hardware, HardwareDataSchema, 'hw')
+  private tpl = this.crud(this.templates, TemplateDataSchema, 'tpl')
+
+  watchMaterials = (cb: (i: Material[]) => void) => this.mat.watch(cb)
+  createMaterial = (input: unknown, by: string) => this.mat.create(input, by)
+  updateMaterial = (id: string, next: MaterialData, by: string) => this.mat.update(id, next, by)
+  watchEdgeBanding = (cb: (i: EdgeBanding[]) => void) => this.edge.watch(cb)
+  createEdgeBanding = (input: unknown, by: string) => this.edge.create(input, by)
+  updateEdgeBanding = (id: string, next: EdgeBandingData, by: string) => this.edge.update(id, next, by)
+  watchHardware = (cb: (i: Hardware[]) => void) => this.hw.watch(cb)
+  createHardware = (input: unknown, by: string) => this.hw.create(input, by)
+  updateHardware = (id: string, next: HardwareData, by: string) => this.hw.update(id, next, by)
+  watchTemplates = (cb: (i: Template[]) => void) => this.tpl.watch(cb)
+  createTemplate = (input: unknown, by: string) => this.tpl.create(input, by)
+  updateTemplate = (id: string, next: TemplateData, by: string) => this.tpl.update(id, next, by)
+  deleteTemplate = (id: string) => {
+    this.templates.delete(id)
+    return this.done(id)
+  }
+
+  watchServiceRates(cb: (s: { rates: ServiceRates; exists: boolean }) => void) {
+    return this.watch(() => cb({ rates: this.serviceRates, exists: this.serviceRatesExist }))
+  }
+
+  saveServiceRates(next: ServiceRates) {
+    this.serviceRates = ServiceRatesSchema.parse(next)
+    this.serviceRatesExist = true
+    return this.done('services')
   }
 
   saveWorkshopSettings(next: WorkshopSettings) {
