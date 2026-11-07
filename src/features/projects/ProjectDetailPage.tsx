@@ -1,4 +1,5 @@
-import { ArrowLeft, FileText, MessageCircle, Pencil, Wallet } from 'lucide-react'
+import { ArrowLeft, FileText, MessageCircle, Pencil } from 'lucide-react'
+import { ProjectMovements } from '@/features/wallet/ProjectMovements'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -218,15 +219,8 @@ export function ProjectDetailPage() {
             Crear presupuesto (próximamente)
           </Button>
         </Card>
-        <Card>
-          <h2 className="mb-2 flex items-center gap-2 font-semibold">
-            <Wallet className="size-4" aria-hidden /> Cobros y gastos
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Señas, cobros y gastos extra fuera del presupuesto aparecerán acá (próximamente, con la billetera).
-          </p>
-        </Card>
       </div>
+      <ProjectMovements projectId={project.id} estimatedCostCents={project.estimatedCostCents} />
     </section>
   )
 }

@@ -8,6 +8,9 @@ import { ClientsListPage } from '@/features/clients/ClientsListPage'
 import { ProjectDetailPage } from '@/features/projects/ProjectDetailPage'
 import { ProjectNewPage } from '@/features/projects/ProjectNewPage'
 import { ProjectsListPage } from '@/features/projects/ProjectsListPage'
+import { MovementDetailPage } from '@/features/wallet/MovementDetailPage'
+import { MovementNewPage } from '@/features/wallet/MovementNewPage'
+import { WalletPage } from '@/features/wallet/WalletPage'
 import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
@@ -36,7 +39,9 @@ export function AppRoutes() {
         <Route path="proyectos" element={<ProjectsListPage />} />
         <Route path="proyectos/nuevo" element={<ProjectNewPage />} />
         <Route path="proyectos/:id" element={<ProjectDetailPage />} />
-        <Route path="billetera" element={<ComingSoonPage title="Billetera" />} />
+        <Route path="billetera" element={<WalletPage />} />
+        <Route path="billetera/nuevo" element={<MovementNewPage />} />
+        <Route path="billetera/movimientos/:id" element={<MovementDetailPage />} />
         <Route path="presupuestos" element={<ComingSoonPage title="Presupuestos" />} />
         <Route path="ajustes" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

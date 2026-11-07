@@ -58,9 +58,9 @@ describe('App', () => {
   })
 
   it('las secciones de negocio muestran "Próximamente"', async () => {
-    const { emit } = setup(['nacho@gmail.com'], '/billetera')
+    const { emit } = setup(['nacho@gmail.com'], '/presupuestos')
     await act(async () => emit(nacho))
-    expect(screen.getByRole('heading', { name: 'Billetera' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Presupuestos' })).toBeInTheDocument()
     expect(screen.getByText(/próximamente/i)).toBeInTheDocument()
   })
 
