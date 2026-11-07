@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Movement } from '@/data/api'
-import { useBoxes, useMembers, useProjects } from '@/data/hooks'
+import { useBoxes, useGeneralExpenses, useMembers, useProjects } from '@/data/hooks'
 import { TYPE_LABELS } from './labels'
 
 /** Resuelve ids/emails a nombres legibles para listas e historial. */
@@ -8,8 +8,10 @@ export function useWalletNames() {
   const boxes = useBoxes()
   const members = useMembers()
   const projects = useProjects()
+  const generalExpenses = useGeneralExpenses()
 
   return useMemo(() => {
+    const expense = new Map((generalExpenses ?? []).map((g) => [g.id, g.name]))
     const box = new Map((boxes ?? []).map((b) => [b.id, b.name]))
     const member = new Map((members ?? []).map((m) => [m.email, m.name]))
     const project = new Map((projects ?? []).map((p) => [p.id, p.title]))
@@ -20,6 +22,7 @@ export function useWalletNames() {
     /** Resumen en una línea: "Cocina · Efectivo", "Nacho · Banco", "Efectivo → Banco". */
     const summary = (m: Movement) => {
       const parts: string[] = []
+      if (m.generalExpenseId) parts.push(expense.get(m.generalExpenseId) ?? 'Gasto general')
       if (m.projectId) parts.push(projectName(m.projectId))
       if (m.projectSplits.length > 0) parts.push(m.projectSplits.map((s) => projectName(s.projectId)).join(' + '))
       if (m.memberEmail) parts.push(memberName(m.memberEmail))
@@ -40,5 +43,5 @@ export function useWalletNames() {
       summary,
       typeLabel: (m: Movement) => TYPE_LABELS[m.type],
     }
-  }, [boxes, members, projects])
+  }, [boxes, members, projects, generalExpenses])
 }

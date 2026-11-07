@@ -77,4 +77,19 @@ await movement('demo-m3', { type: 'gasto_proyecto', amountCents: 26368, date: is
 await movement('demo-m4', { type: 'transferencia', amountCents: 50000, date: iso(-4), boxId: 'demo-banco', toBoxId: 'demo-efectivo' })
 await movement('demo-m5', { type: 'gasto_proyecto', status: 'pendiente_pago', amountCents: 37224, date: iso(-1), projectId: 'demo-cocina', category: 'Ferretería', description: 'Bisagras y correderas' })
 
+const geShares = { [DEV_EMAIL]: 5000, 'nahuel@taller.test': 5000 }
+await put('generalExpenses/demo-alquiler', {
+  name: 'Alquiler del taller', kind: 'fijo', category: 'Taller', amountCents: 25000, dayOfMonth: 1,
+  shares: geShares, active: true, notes: '', ...audit,
+})
+await put('generalExpenses/demo-luz', {
+  name: 'Luz', kind: 'fijo', category: 'Servicios', amountCents: 6500, dayOfMonth: 28,
+  shares: geShares, active: true, notes: '', ...audit,
+})
+await put('generalExpenses/demo-laser', {
+  name: 'Nivel láser', kind: 'esporadico', category: 'Herramientas', amountCents: 32698, dayOfMonth: null,
+  shares: geShares, active: true, notes: '', ...audit,
+})
+await movement('demo-m6', { type: 'gasto_general', amountCents: 32698, date: iso(-12), generalExpenseId: 'demo-laser', boxId: 'demo-banco', category: 'Herramientas', description: 'Nivel láser' })
+
 console.log(`Emulador sembrado. Entrá con Google → "Add new account" → ${DEV_EMAIL}`)

@@ -30,7 +30,7 @@ import {
   updateMovement,
   type StoredMovement,
 } from '@/data/repo'
-import { ClientDataSchema, MovementDataSchema, ProjectDataSchema, QuoteDataSchema } from '@/model'
+import { ClientDataSchema, GeneralExpenseDataSchema, MovementDataSchema, ProjectDataSchema, QuoteDataSchema } from '@/model'
 
 let env: RulesTestEnvironment
 
@@ -197,6 +197,30 @@ describe('proyectos', () => {
     const huge = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`s${i}@x.com`, 0]))
     await assertFails(setDoc(doc(db, 'settings/workshop'), { name: 'T', defaultShares: huge, ...stamp(NACHO) }))
     await assertFails(setDoc(doc(db, 'settings/workshop'), { name: 'T', defaultShares: 'basura', ...stamp(NACHO) }))
+  })
+})
+
+describe('gastos generales', () => {
+  it('se crean con reparto y se pagan con un movimiento gasto_general auditado', async () => {
+    const db = dbAs(NACHO)
+    const g = createDocument(
+      db,
+      'generalExpenses',
+      GeneralExpenseDataSchema,
+      { name: 'Alquiler', kind: 'fijo', category: 'Taller', amountCents: 25000, dayOfMonth: 1, shares: { [NACHO]: 5000, [NAHUEL]: 5000 } },
+      NACHO,
+    )
+    await assertSucceeds(g.committed)
+    const pay = createMovement(db, { type: 'gasto_general', amountCents: 25000, date: '2026-11-07', generalExpenseId: g.id, boxId: 'b1' }, NACHO)
+    await assertSucceeds(pay.committed)
+  })
+
+  it('las reglas rechazan un gasto general con importe no positivo o tipo desconocido', async () => {
+    const db = dbAs(NACHO)
+    const base = { name: 'Luz', kind: 'fijo', category: 'Taller', amountCents: 8000, shares: { taller: 10000 }, ...stamp(NACHO) }
+    await assertFails(setDoc(doc(db, 'generalExpenses/g1'), { ...base, amountCents: 0 }))
+    await assertFails(setDoc(doc(db, 'generalExpenses/g2'), { ...base, kind: 'mensual' }))
+    await assertSucceeds(setDoc(doc(db, 'generalExpenses/g3'), base))
   })
 })
 

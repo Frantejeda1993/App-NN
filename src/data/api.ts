@@ -6,6 +6,8 @@ import type {
   ClientDataSchema,
   ContactData,
   ContactDataSchema,
+  GeneralExpenseData,
+  GeneralExpenseDataSchema,
   MovementControl,
   MovementData,
   MovementDataSchema,
@@ -22,6 +24,7 @@ export type Client = Stored<ClientData>
 export type Contact = Stored<ContactData>
 export type Project = Stored<ProjectData>
 export type Box = Stored<BoxData>
+export type GeneralExpense = Stored<GeneralExpenseData>
 export type Movement = Stored<MovementData> & MovementControl
 
 /** Una versión de un movimiento en el historial (auditLog). */
@@ -64,6 +67,11 @@ export interface DataApi {
   watchBoxes(cb: (boxes: Box[]) => void): Unsubscribe
   createBox(input: z.input<typeof BoxDataSchema>, by: string): WriteResult
   updateBox(id: string, next: BoxData, by: string): WriteResult
+
+  watchGeneralExpenses(cb: (expenses: GeneralExpense[]) => void): Unsubscribe
+  createGeneralExpense(input: z.input<typeof GeneralExpenseDataSchema>, by: string): WriteResult
+  /** `next` es el gasto completo (no un parche). */
+  updateGeneralExpense(id: string, next: GeneralExpenseData, by: string): WriteResult
 
   watchMovements(cb: (movements: Movement[]) => void): Unsubscribe
   watchMovementHistory(movementId: string, cb: (entries: AuditEntry[]) => void): Unsubscribe

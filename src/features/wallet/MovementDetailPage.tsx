@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge, Card, Field, Select, Textarea } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
 import type { Movement } from '@/data/api'
-import { useMovementHistory, useMovements } from '@/data/hooks'
+import { useGeneralExpenses, useMovementHistory, useMovements } from '@/data/hooks'
 import { formatDateEs } from '@/domain/dates'
 import { formatEuros } from '@/domain/money'
 import { diffMovement, displaySign, memberDebts } from '@/domain/wallet'
@@ -24,6 +24,7 @@ export function MovementDetailPage() {
   const me = useMyEmail()
   const movements = useMovements()
   const history = useMovementHistory(id)
+  const generalExpenses = useGeneralExpenses()
   const names = useWalletNames()
   const [mode, setModeState] = useState<Mode>('view')
   // Versión que se estaba viendo al empezar a editar/pagar/eliminar: si otro
@@ -36,7 +37,7 @@ export function MovementDetailPage() {
   const movement = movements?.find((m) => m.id === id)
   const debts = useMemo(() => memberDebts(movements ?? []), [movements])
 
-  if (!movements || names.loading) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!movements || names.loading || !generalExpenses) return <p className="text-sm text-muted-foreground">Cargando…</p>
   if (!movement) {
     return (
       <section className="flex flex-col gap-3">
@@ -151,6 +152,7 @@ export function MovementDetailPage() {
             members={names.members!}
             projects={names.projects!}
             debts={debts}
+            generalExpenses={generalExpenses ?? []}
             initial={draft ?? data.data}
             submitLabel="Guardar cambios"
             onCancel={() => {

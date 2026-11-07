@@ -14,6 +14,7 @@ import {
   ClientDataSchema,
   ContactDataSchema,
   BoxDataSchema,
+  GeneralExpenseDataSchema,
   MemberDataSchema,
   MovementBaseSchema,
   MovementControlSchema,
@@ -153,6 +154,22 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
 
     updateBox(id, next, by) {
       return updateDocument(db, COLLECTIONS.boxes, id, BoxDataSchema, next, by)
+    },
+
+    watchGeneralExpenses(cb) {
+      return onSnapshot(
+        collection(db, COLLECTIONS.generalExpenses),
+        (snap) => cb(snap.docs.map((d) => toStored(GeneralExpenseDataSchema, d)).filter((g) => g !== null).sort(byName)),
+        onError('gastos generales'),
+      )
+    },
+
+    createGeneralExpense(input, by) {
+      return createDocument(db, COLLECTIONS.generalExpenses, GeneralExpenseDataSchema, input, by)
+    },
+
+    updateGeneralExpense(id, next, by) {
+      return updateDocument(db, COLLECTIONS.generalExpenses, id, GeneralExpenseDataSchema, next, by)
     },
 
     watchMovements(cb) {

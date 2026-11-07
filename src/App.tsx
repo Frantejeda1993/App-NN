@@ -8,6 +8,7 @@ import { ClientsListPage } from '@/features/clients/ClientsListPage'
 import { ProjectDetailPage } from '@/features/projects/ProjectDetailPage'
 import { ProjectNewPage } from '@/features/projects/ProjectNewPage'
 import { ProjectsListPage } from '@/features/projects/ProjectsListPage'
+import { GeneralExpenseFormPage } from '@/features/wallet/GeneralExpenseFormPage'
 import { MovementDetailPage } from '@/features/wallet/MovementDetailPage'
 import { MovementNewPage } from '@/features/wallet/MovementNewPage'
 import { WalletPage } from '@/features/wallet/WalletPage'
@@ -42,6 +43,8 @@ export function AppRoutes() {
         <Route path="billetera" element={<WalletPage />} />
         <Route path="billetera/nuevo" element={<MovementNewPage />} />
         <Route path="billetera/movimientos/:id" element={<MovementDetailPage />} />
+        <Route path="billetera/gastos/nuevo" element={<GeneralExpenseFormPage />} />
+        <Route path="billetera/gastos/:id" element={<GeneralExpenseFormPage />} />
         <Route path="presupuestos" element={<ComingSoonPage title="Presupuestos" />} />
         <Route path="ajustes" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

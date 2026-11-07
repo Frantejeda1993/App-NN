@@ -1,8 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
-import type { Box, Member, Project } from '@/data/api'
+import type { Box, GeneralExpense, Member, Project } from '@/data/api'
 import { todayIso } from '@/domain/dates'
 import { formatEuros, parseEuros } from '@/domain/money'
 import { MovementDataSchema, type MovementData, type MovementType } from '@/model'
@@ -22,6 +22,7 @@ const SHOWN_INLINE = new Set([
   'memberEmail',
   'category',
   'description',
+  'generalExpenseId',
 ])
 
 interface SplitRow {
@@ -35,14 +36,34 @@ export interface MovementFormProps {
   projects: Project[]
   /** Lo que el taller le debe a cada socio (para el reintegro). */
   debts?: Record<string, number>
+  /** Gastos generales (habilita el tipo "Gasto general"). */
+  generalExpenses?: GeneralExpense[]
   initial?: Partial<MovementData>
   submitLabel: string
   onSubmit: (data: MovementData) => boolean
   onCancel?: () => void
 }
 
-export function MovementForm({ boxes, members, projects, debts = {}, initial, submitLabel, onSubmit, onCancel }: MovementFormProps) {
+export function MovementForm({
+  boxes,
+  members,
+  projects,
+  debts = {},
+  generalExpenses = [],
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: MovementFormProps) {
   const [type, setType] = useState<MovementType>(initial?.type ?? 'cobro')
+  const [generalExpenseId, setGeneralExpenseId] = useState(initial?.generalExpenseId ?? '')
+  // Lo que la app completó a partir del gasto general elegido (ver chooseGeneralExpense).
+  const autoFilled = useRef<{ amount: string; category: string; description: string } | null>(
+    (() => {
+      const g = generalExpenses.find((x) => x.id === initial?.generalExpenseId)
+      return g ? { amount: toInput(g.amountCents), category: g.category, description: g.name } : null
+    })(),
+  )
   const [amount, setAmount] = useState(initial?.amountCents ? toInput(initial.amountCents) : '')
   const [date, setDate] = useState(initial?.date ?? todayIso())
   const [description, setDescription] = useState(initial?.description ?? '')
@@ -71,7 +92,27 @@ export function MovementForm({ boxes, members, projects, debts = {}, initial, su
   const activeMembers = members.filter((m) => m.active || m.email === initial?.paidBy || m.email === initial?.memberEmail)
   const keepProjects = new Set([initial?.projectId, ...(initial?.projectSplits ?? []).map((s) => s.projectId)])
   const selectableProjects = projects.filter((p) => p.status !== 'archivado' || keepProjects.has(p.id))
-  const types = initial?.type === 'gasto_general' ? [...FORM_TYPES, 'gasto_general' as const] : FORM_TYPES
+  const selectableExpenses = generalExpenses.filter((g) => g.active || g.id === initial?.generalExpenseId)
+  const types: MovementType[] =
+    selectableExpenses.length > 0 || initial?.type === 'gasto_general' ? [...FORM_TYPES, 'gasto_general'] : FORM_TYPES
+
+  /**
+   * Al elegir un gasto general se completan importe, categoría y descripción.
+   * Se reemplaza un campo si está vacío o si todavía tiene lo que completó la app
+   * con el gasto anterior; nunca lo que escribió el usuario.
+   */
+  function chooseGeneralExpense(id: string) {
+    setGeneralExpenseId(id)
+    const g = generalExpenses.find((x) => x.id === id)
+    if (!g) return
+    const prev = autoFilled.current
+    const replaceable = (current: string, auto: string | undefined) => !current.trim() || current === auto
+    const next = { amount: toInput(g.amountCents), category: g.category, description: g.name }
+    if (replaceable(amount, prev?.amount)) setAmount(next.amount)
+    if (replaceable(category, prev?.category)) setCategory(next.category)
+    if (replaceable(description, prev?.description)) setDescription(next.description)
+    autoFilled.current = next
+  }
 
   const splitTotal = splits.reduce((s, r) => s + (parseEuros(r.amount) ?? 0), 0)
   const amountCents = parseEuros(amount)
@@ -103,7 +144,7 @@ export function MovementForm({ boxes, members, projects, debts = {}, initial, su
         type === 'gasto_proyecto' && splitMode
           ? splits.map((r, i) => ({ projectId: r.projectId, amountCents: splitCents[i] ?? 0 }))
           : [],
-      generalExpenseId: type === 'gasto_general' ? (initial?.generalExpenseId ?? null) : null,
+      generalExpenseId: type === 'gasto_general' ? generalExpenseId || null : null,
     }
     const parsed = MovementDataSchema.safeParse(data)
     if (!parsed.success) {
@@ -152,6 +193,24 @@ export function MovementForm({ boxes, members, projects, debts = {}, initial, su
           ))}
         </Select>
       </Field>
+
+      {type === 'gasto_general' && (
+        <Field id="mv-general" label="Gasto general *" error={errors.generalExpenseId} className="md:col-span-2">
+          <Select
+            id="mv-general"
+            value={generalExpenseId}
+            onChange={(e) => chooseGeneralExpense(e.target.value)}
+            aria-invalid={!!errors.generalExpenseId}
+          >
+            <option value="">Elegí un gasto general…</option>
+            {selectableExpenses.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} ({g.category})
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
 
       <Field id="mv-amount" label="Importe (€) *" error={errors.amountCents}>
         <Input

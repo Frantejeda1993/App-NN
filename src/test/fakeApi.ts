@@ -3,7 +3,9 @@ import {
   BoxDataSchema,
   ClientDataSchema,
   ContactDataSchema,
+  GeneralExpenseDataSchema,
   MovementDataSchema,
+  type GeneralExpenseData,
   ProjectDataSchema,
   type BoxData,
   type MovementData,
@@ -21,6 +23,7 @@ import {
   type AuditEntry,
   type Box,
   type Client,
+  type GeneralExpense,
   type Movement,
   type Contact,
   type DataApi,
@@ -200,6 +203,32 @@ export class FakeDataApi implements DataApi {
   updateBox(id: string, next: BoxData, by: string) {
     const prev = this.boxes.get(id)!
     this.boxes.set(id, { ...BoxDataSchema.parse(next), ...this.stamp(by, prev), id })
+    return this.done(id)
+  }
+
+  // ---- gastos generales ----
+  generalExpenses = new Map<string, GeneralExpense>()
+
+  seedGeneralExpense(input: Record<string, unknown>, id = `g${++this.seq}`): GeneralExpense {
+    const g: GeneralExpense = { ...GeneralExpenseDataSchema.parse(input), ...this.stamp('nacho@gmail.com'), id }
+    this.generalExpenses.set(id, g)
+    this.emit()
+    return g
+  }
+
+  watchGeneralExpenses(cb: (g: GeneralExpense[]) => void) {
+    return this.watch(() => cb([...this.generalExpenses.values()].sort(byName)))
+  }
+
+  createGeneralExpense(input: unknown, by: string) {
+    const id = `g${++this.seq}`
+    this.generalExpenses.set(id, { ...GeneralExpenseDataSchema.parse(input), ...this.stamp(by), id })
+    return this.done(id)
+  }
+
+  updateGeneralExpense(id: string, next: GeneralExpenseData, by: string) {
+    const prev = this.generalExpenses.get(id)!
+    this.generalExpenses.set(id, { ...GeneralExpenseDataSchema.parse(next), ...this.stamp(by, prev), id })
     return this.done(id)
   }
 

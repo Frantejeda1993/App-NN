@@ -10,16 +10,18 @@ import { boxBalances, filterMovements, memberDebts, type MovementFilters } from 
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { BoxDataSchema, MOVEMENT_TYPES, type MovementType } from '@/model'
+import { GeneralExpensesTab } from './GeneralExpensesTab'
 import { MovementRow } from './MovementRow'
 import { TYPE_LABELS } from './labels'
 import { useWalletNames } from './useWalletNames'
 
-const TABS = { movimientos: 'Movimientos', cajas: 'Cajas' } as const
+const TABS = { movimientos: 'Movimientos', cajas: 'Cajas', gastos: 'Gastos generales' } as const
 type Tab = keyof typeof TABS
 
 export function WalletPage() {
   const [params, setParams] = useSearchParams()
-  const tab: Tab = params.get('tab') === 'cajas' ? 'cajas' : 'movimientos'
+  const requested = params.get('tab')
+  const tab: Tab = requested === 'cajas' || requested === 'gastos' ? requested : 'movimientos'
 
   return (
     <section className="flex flex-col gap-4">
@@ -45,7 +47,7 @@ export function WalletPage() {
           </button>
         ))}
       </div>
-      {tab === 'movimientos' ? <MovementsTab /> : <BoxesTab />}
+      {tab === 'movimientos' ? <MovementsTab /> : tab === 'cajas' ? <BoxesTab /> : <GeneralExpensesTab />}
     </section>
   )
 }
