@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+/* Paleta: neutros cálidos + acento madera. Tokens al estilo shadcn/ui. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --background: oklch(0.985 0.002 75);
+  --foreground: oklch(0.22 0.01 60);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.955 0.005 75);
+  --muted-foreground: oklch(0.5 0.015 60);
+  --border: oklch(0.91 0.008 75);
+  --primary: oklch(0.47 0.11 55);
+  --primary-foreground: oklch(0.985 0.002 75);
+  --destructive: oklch(0.55 0.2 27);
+  --ring: oklch(0.47 0.11 55);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.18 0.006 60);
+    --foreground: oklch(0.95 0.004 75);
+    --card: oklch(0.22 0.006 60);
+    --muted: oklch(0.27 0.008 60);
+    --muted-foreground: oklch(0.7 0.012 70);
+    --border: oklch(0.3 0.008 60);
+    --primary: oklch(0.72 0.12 65);
+    --primary-foreground: oklch(0.18 0.006 60);
+    --destructive: oklch(0.68 0.18 25);
+    --ring: oklch(0.72 0.12 65);
+    color-scheme: dark;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
