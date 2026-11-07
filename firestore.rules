@@ -71,10 +71,16 @@ service cloud.firestore {
     }
 
     // ---- Configuración ------------------------------------------------------
+    // Reparto por defecto opcional: si está, como cualquier reparto (≤ 20 entradas).
+    function validSettings() {
+      let d = request.resource.data;
+      return !('defaultShares' in d) || d.defaultShares == null || validShares(d.defaultShares);
+    }
+
     match /settings/{docId} {
       allow read: if isMember();
-      allow create: if canCreate() && docId in ['workshop', 'services'];
-      allow update: if canUpdate();
+      allow create: if canCreate() && docId in ['workshop', 'services'] && validSettings();
+      allow update: if canUpdate() && validSettings();
       allow delete: if false;
     }
 

@@ -167,6 +167,35 @@ describe('auditoría en documentos comunes', () => {
   })
 })
 
+describe('proyectos', () => {
+  it('se crean y editan con la participación como mapa de emails (con puntos)', async () => {
+    const db = dbAs(NACHO)
+    const base = { title: 'Cocina', clientId: 'c1', shares: { [NACHO]: 4000, [NAHUEL]: 4000, taller: 2000 } }
+    const p = createDocument(db, 'projects', ProjectDataSchema, base, NACHO)
+    await assertSucceeds(p.committed)
+
+    const next = ProjectDataSchema.parse({ ...base, status: 'en_proceso', shares: { [NACHO]: 5000, [NAHUEL]: 5000, taller: 0 } })
+    await assertSucceeds(updateDocument(dbAs(NAHUEL), 'projects', p.id, ProjectDataSchema, next, NAHUEL).committed)
+    const saved = (await getDoc(doc(db, 'projects', p.id))).data()
+    expect(saved).toMatchObject({ status: 'en_proceso', shares: { [NACHO]: 5000, [NAHUEL]: 5000, taller: 0 }, createdBy: NACHO })
+  })
+
+  it('el reparto por defecto se guarda en settings/workshop', async () => {
+    const db = dbAs(NACHO)
+    await assertSucceeds(
+      setDoc(doc(db, 'settings/workshop'), { name: 'Taller', defaultShares: { [NACHO]: 5000, [NAHUEL]: 5000 }, ...stamp(NACHO) }),
+    )
+    await assertSucceeds(setDoc(doc(db, 'settings/services'), { cutAndEdgePerM2Cents: 1600, ...stamp(NACHO) }))
+  })
+
+  it('un reparto por defecto gigante o que no es un mapa se rechaza', async () => {
+    const db = dbAs(NACHO)
+    const huge = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`s${i}@x.com`, 0]))
+    await assertFails(setDoc(doc(db, 'settings/workshop'), { name: 'T', defaultShares: huge, ...stamp(NACHO) }))
+    await assertFails(setDoc(doc(db, 'settings/workshop'), { name: 'T', defaultShares: 'basura', ...stamp(NACHO) }))
+  })
+})
+
 describe('contactos con clientes', () => {
   it('addContact guarda el contacto y actualiza el cliente en una sola escritura', async () => {
     const db = dbAs(NACHO)
