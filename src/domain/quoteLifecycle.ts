@@ -78,6 +78,7 @@ export function newVersionInput(q: QuoteData & { id: string }, today: string, va
     validUntil: addDays(today, validityDays),
     items: rest.items.map((i) => ({ ...i, accepted: true })),
     freeLines: rest.freeLines.map((l) => ({ ...l, accepted: true })),
+    purchased: [],
   }
 }
 

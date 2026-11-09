@@ -145,8 +145,8 @@ describe('plantillas de mueble', () => {
     const bajo = [...api.templates.values()].find((t) => t.name === 'Bajo cocina 60')!
     expect(api.materials.get(bajo.item.structure.materialId!)?.name).toMatch(/melamina blanca 19mm/i)
 
-    await userEvent.click(btn)
-    expect(await screen.findByText(/ya estaban cargadas/i)).toBeInTheDocument()
+    // Ya cargadas: el botón desaparece.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /cargar plantillas del excel/i })).not.toBeInTheDocument())
     expect(api.templates.size).toBe(count)
   })
 })

@@ -10,10 +10,12 @@ import { useClients, useProjects, useQuote, useTemplates, useWorkshopSettings } 
 import { formatDateEs, todayIso } from '@/domain/dates'
 import { formatEuros } from '@/domain/money'
 import { bpToPercent, percentToBp } from '@/domain/percent'
-import { computeQuote, type CatalogLike, type RatesLike } from '@/domain/quote'
+import { computeQuote, type RatesLike } from '@/domain/quote'
+import { shoppingList, type ShoppingCatalog } from '@/domain/shopping'
 import {
   STATUS_LABELS,
   applyStatus,
+  isAcceptedStatus,
   itemFromTemplate,
   newLocalId,
   newVersionInput,
@@ -33,6 +35,7 @@ import {
 } from '@/model'
 import { pdfFileName, quotePdfModel } from '@/domain/quotePdf'
 import { AdjustmentsEditor, Breakdown, FreeLinesEditor, QuoteSummary } from './QuoteParts'
+import { ShoppingListCard } from './ShoppingListCard'
 import { QUOTE_TONES, useQuoteCatalog } from './shared'
 
 const back = '/presupuestos'
@@ -123,7 +126,7 @@ function Editor({
 }: {
   quote: Quote
   refs: CatalogRefs
-  maps: CatalogLike
+  maps: ShoppingCatalog
   rates: RatesLike
   projects: Project[]
   clients: Client[]
@@ -161,13 +164,15 @@ function Editor({
   }
 
   const totals = useMemo(() => computeQuote(draft, maps, rates), [draft, maps, rates])
+  const shopping = useMemo(() => shoppingList(draft, maps), [draft, maps])
   const editable = draft.status === 'borrador'
   const acceptable = ['enviado', 'vencido', 'aceptado', 'aceptado_parcial'].includes(draft.status)
   const project = projects.find((p) => p.id === draft.projectId) ?? null
   const client = clients.find((c) => c.id === (draft.clientId ?? project?.clientId))
 
   /** Valida, guarda con totales y (si hace falta) actualiza el proyecto. */
-  const write = (next: QuoteData, message: string) => {
+  /** `message` null = guardado silencioso (solo avisa si falla). */
+  const write = (next: QuoteData, message: string | null) => {
     if (conflict) {
       notifyError(new Error('Otro socio modificó este presupuesto mientras editabas. Descartá tus cambios para ver los suyos.'))
       return false
@@ -195,7 +200,9 @@ function Editor({
     }
     try {
       setLastWritten(stableKey(parsed.data))
-      notifyWrite(api.updateQuote(quote.id, parsed.data, me), message)
+      const res = api.updateQuote(quote.id, parsed.data, me)
+      if (message) notifyWrite(res, message)
+      else res.committed.catch(notifyError)
       const p = parsed.data.projectId ? projects.find((x) => x.id === parsed.data.projectId) : undefined
       const patch = p ? projectPatchForQuote(p, { id: quote.id, ...parsed.data }) : null
       if (p && patch) notifyWrite(api.updateProject(p.id, ProjectDataSchema.parse({ ...p, ...patch }), me), 'Proyecto actualizado')
@@ -672,6 +679,20 @@ function Editor({
               </Field>
             </div>
           </Card>
+          {isAcceptedStatus(draft.status) && (
+            <ShoppingListCard
+              list={shopping}
+              title={draft.title}
+              projectId={draft.projectId}
+              purchased={draft.purchased}
+              onTogglePurchased={(key, bought) =>
+                write(
+                  { ...draft, purchased: bought ? [...new Set([...draft.purchased, key])] : draft.purchased.filter((k) => k !== key) },
+                  null,
+                )
+              }
+            />
+          )}
         </div>
 
         <aside className="xl:sticky xl:top-4 xl:self-start">

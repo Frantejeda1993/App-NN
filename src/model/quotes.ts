@@ -132,6 +132,8 @@ export const QuoteDataSchema = z.object({
   vatBp: bpSchema.default(0),
   terms: textSchema,
   notes: textSchema,
+  /** Lista de compras: claves de lo ya comprado (sheet:<id>, edge:<id>, hw:<id>). */
+  purchased: z.array(z.string().min(1).max(200)).max(500).default([]),
   /** Totales calculados y guardados para listar sin recalcular. */
   totals: z
     .object({

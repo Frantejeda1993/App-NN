@@ -23,6 +23,10 @@ export function MovementNewPage() {
   const typeParam = params.get('tipo') as MovementType | null
   const projectParam = params.get('proyecto') ?? ''
   const expenseParam = params.get('gasto') ?? ''
+  // Precarga desde la lista de compras: importe en céntimos (entero acotado) y concepto (texto, acotado).
+  const amountParam = Number(params.get('importe'))
+  const prefillAmount = Number.isSafeInteger(amountParam) && amountParam > 0 && amountParam <= 100_000_000 ? amountParam : undefined
+  const prefillDescription = (params.get('concepto') ?? '').trim().slice(0, 200) || undefined
 
   if (names.loading || !movements || !generalExpenses) return <p className="text-sm text-muted-foreground">Cargando…</p>
   // Solo se usan ids que existen (nunca el texto crudo de la URL).
@@ -47,7 +51,7 @@ export function MovementNewPage() {
         category: expense.category,
         description: expense.name,
       }
-    : { type, projectId: projectId || null }
+    : { type, projectId: projectId || null, amountCents: prefillAmount, description: prefillDescription }
 
   return (
     <section className="flex max-w-3xl flex-col gap-4">

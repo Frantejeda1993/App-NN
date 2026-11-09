@@ -151,6 +151,9 @@ const EXCEL_TEMPLATES: TemplateSpec[] = [
   { name: 'Estantería abierta', category: 'Living', w: 600, h: 1500, d: 450, shelves: 4, back: false },
 ]
 
+/** Nombres de las plantillas del Excel (para saber si ya se cargaron). */
+export const EXCEL_TEMPLATE_NAMES: readonly string[] = EXCEL_TEMPLATES.map((t) => t.name)
+
 /**
  * Plantillas del Excel. Materiales y herrajes se buscan por nombre en el
  * catálogo cargado; lo que no está queda vacío y se informa en `missing`.

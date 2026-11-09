@@ -172,6 +172,14 @@ describe('auditoría en documentos comunes', () => {
     await assertSucceeds(updateDocument(db, 'quotes', sent.id, QuoteDataSchema, { ...base, status: 'aceptado' }, NACHO).committed)
   })
 
+  it('lo comprado de la lista de compras debe ser una lista acotada', async () => {
+    const db = dbAs(NACHO)
+    const base = { title: 'Q', status: 'aceptado', version: 1, items: [], freeLines: [], adjustments: [], ...stamp(NACHO) }
+    await assertSucceeds(setDoc(doc(db, 'quotes/qp1'), { ...base, purchased: ['hw:h1', 'sheet:m1'] }))
+    await assertFails(setDoc(doc(db, 'quotes/qp2'), { ...base, purchased: 'hw:h1' }))
+    await assertFails(setDoc(doc(db, 'quotes/qp3'), { ...base, purchased: Array.from({ length: 501 }, (_, i) => `hw:${i}`) }))
+  })
+
   it('un reparto con demasiados participantes se rechaza', async () => {
     const db = dbAs(NACHO)
     const shares = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`s${i}@x.com`, 0]))

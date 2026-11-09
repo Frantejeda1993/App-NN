@@ -275,7 +275,8 @@ service cloud.firestore {
         && d.version is int && d.version >= 1
         && d.items is list && d.items.size() <= 200
         && d.freeLines is list && d.freeLines.size() <= 100
-        && d.adjustments is list && d.adjustments.size() <= 50;
+        && d.adjustments is list && d.adjustments.size() <= 50
+        && (!('purchased' in d) || (d.purchased is list && d.purchased.size() <= 500));
     }
 
     match /quotes/{quoteId} {

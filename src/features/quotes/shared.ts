@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import type { DataApi, Project, SettingsState } from '@/data/api'
 import { useEdgeBanding, useHardware, useMaterials, useServiceRates } from '@/data/hooks'
 import { todayIso } from '@/domain/dates'
-import type { CatalogLike, RatesLike } from '@/domain/quote'
+import type { RatesLike } from '@/domain/quote'
+import type { ShoppingCatalog } from '@/domain/shopping'
 import { newQuoteInput } from '@/domain/quoteLifecycle'
 import type { CatalogRefs } from '@/features/furniture/FurnitureItemEditor'
 import { notifyWrite } from '@/lib/notify'
@@ -40,7 +41,7 @@ const GROUP_STATUSES: Record<Exclude<QuoteGroup, 'todos'>, QuoteStatus[]> = {
 export const inQuoteGroup = (status: QuoteStatus, g: QuoteGroup) => g === 'todos' || GROUP_STATUSES[g].includes(status)
 
 /** Catálogo (listas para los selectores + mapas para el cálculo) y tarifas. */
-export function useQuoteCatalog(): { refs: CatalogRefs; maps: CatalogLike; rates: RatesLike } | undefined {
+export function useQuoteCatalog(): { refs: CatalogRefs; maps: ShoppingCatalog; rates: RatesLike } | undefined {
   const materials = useMaterials()
   const hardware = useHardware()
   const edgeBanding = useEdgeBanding()

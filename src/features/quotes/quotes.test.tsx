@@ -167,4 +167,40 @@ describe('presupuestos', () => {
     await userEvent.type(screen.getByLabelText(/buscar presupuestos/i), 'ana')
     expect(within(screen.getByRole('list', { name: /^presupuestos$/i })).getAllByRole('listitem')).toHaveLength(1)
   })
+
+  it('lista de compras: por proveedor, marca comprado y precarga el gasto', async () => {
+    const { api, project } = setup()
+    api.seedBox('Banco')
+    api.createHardware({ name: 'Bisagra 110°', kind: 'bisagra', unit: 'u', priceCents: 460, supplier: 'Esteba' }, ME)
+    const hingeId = [...api.hardware.keys()][0]
+    const q = api.seedQuote({
+      title: 'Cocina',
+      projectId: project.id,
+      status: 'aceptado',
+      items: [item({ quantity: 2, doors: { count: 2, hinges: [{ hardwareId: hingeId, qty: 4 }] } }), item({ id: 'i2', accepted: false, doors: { count: 1, hinges: [{ hardwareId: hingeId, qty: 50 }] } })],
+    })
+    renderApp(`/presupuestos/${q.id}`, api)
+
+    const esteba = await screen.findByRole('region', { name: /proveedor esteba/i })
+    // Solo lo aceptado: 4 bisagras × 2 muebles.
+    expect(esteba).toHaveTextContent('8 u')
+    expect(esteba).toHaveTextContent('36,80 €')
+
+    await userEvent.click(within(esteba).getByRole('checkbox', { name: /bisagra 110°/i }))
+    await waitFor(() => expect(api.quotes.get(q.id)!.purchased).toEqual([`hw:${hingeId}`]))
+    expect(within(esteba).getByText(/1\/1 comprado/)).toBeInTheDocument()
+
+    await userEvent.click(within(esteba).getByRole('link', { name: /registrar gasto/i }))
+    expect(await screen.findByRole('heading', { name: /nuevo movimiento/i })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('36,80')).toBeInTheDocument()
+    expect(screen.getByDisplayValue(/compra de materiales – esteba/i)).toBeInTheDocument()
+  })
+
+  it('la lista de compras no aparece en un borrador', async () => {
+    const { api } = setup()
+    const q = api.seedQuote({ title: 'Cocina', items: [item()] })
+    renderApp(`/presupuestos/${q.id}`, api)
+    expect(await screen.findByRole('heading', { name: /cocina/i })).toBeInTheDocument()
+    expect(screen.queryByText(/lista de compras/i)).not.toBeInTheDocument()
+  })
 })

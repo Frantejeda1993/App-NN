@@ -5,7 +5,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, Field, Input } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
 import { useEdgeBanding, useHardware, useMaterials, useServiceRates, useTemplates } from '@/data/hooks'
-import { excelSeed, excelTemplates, pricePerM2Cents } from '@/domain/catalog'
+import { EXCEL_TEMPLATE_NAMES, excelSeed, excelTemplates, pricePerM2Cents } from '@/domain/catalog'
 import { formatEuros, parseEuros } from '@/domain/money'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
@@ -268,6 +268,10 @@ function TemplatesTab() {
   const [seeding, setSeeding] = useState(false)
   if (!templates || !materials || !hardware) return <p className="text-sm text-muted-foreground">Cargando…</p>
 
+  // Una vez cargadas (alguna existe), el botón ya no se muestra.
+  const names = new Set(templates.map((t) => t.name.trim().toLowerCase()))
+  const excelLoaded = EXCEL_TEMPLATE_NAMES.some((n) => names.has(n.toLowerCase()))
+
   // Carga las plantillas comunes del Excel que todavía no existan (por nombre).
   const seedTemplates = () => {
     if (seeding) return
@@ -297,9 +301,11 @@ function TemplatesTab() {
         <Link to="/catalogo/plantillas/nueva" className={buttonVariants()}>
           <Plus /> Nueva plantilla
         </Link>
-        <Button variant="outline" onClick={seedTemplates} disabled={seeding}>
-          Cargar plantillas del Excel
-        </Button>
+        {!excelLoaded && (
+          <Button variant="outline" onClick={seedTemplates} disabled={seeding}>
+            Cargar plantillas del Excel
+          </Button>
+        )}
       </div>
       <Card>
         <h2 className="mb-2 font-semibold">Plantillas de mueble</h2>
