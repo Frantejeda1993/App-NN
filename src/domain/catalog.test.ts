@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EdgeBandingDataSchema, HardwareDataSchema, MaterialDataSchema } from '@/model'
-import { excelSeed, parseSheetSize, parseThickness, pricePerM2Cents } from './catalog'
+import { EdgeBandingDataSchema, HardwareDataSchema, MaterialDataSchema, TemplateDataSchema } from '@/model'
+import { excelSeed, excelTemplates, parseSheetSize, parseThickness, pricePerM2Cents } from './catalog'
 
 describe('precio por m²', () => {
   it('divide el precio de la placa por su área', () => {
@@ -50,5 +50,39 @@ describe('carga inicial desde el Excel', () => {
     expect(seed.hardware.find((h) => h.kind === 'led' && h.unit === 'ml')).toBeTruthy()
     expect(seed.edgeBanding.map((e) => e.pricePerMeterCents)).toEqual([178, 200])
     expect(seed.services.cutAndEdgePerM2Cents).toBe(1600)
+  })
+})
+
+describe('plantillas del Excel', () => {
+  const seed = excelSeed()
+  const withIds = <T extends { name: string }>(xs: T[]) => xs.map((x, i) => ({ ...x, id: `id${i}` }))
+  const materials = withIds(seed.materials)
+  const hardware = withIds(seed.hardware)
+  const idOf = (xs: { id: string; name: string }[], prefix: string) => xs.find((x) => x.name.startsWith(prefix))!.id
+
+  it('son válidas y referencian el catálogo por nombre', () => {
+    const { templates, missing } = excelTemplates(materials, hardware)
+    expect(missing).toEqual([])
+    expect(templates.length).toBeGreaterThanOrEqual(12)
+    for (const t of templates) expect(TemplateDataSchema.safeParse(t).success).toBe(true)
+
+    const bajo = templates.find((t) => t.name === 'Bajo cocina 60')!
+    expect(bajo.item).toMatchObject({ widthMm: 600, heightMm: 800, depthMm: 580, shelves: 1 })
+    expect(bajo.item.structure.materialId).toBe(idOf(materials, 'Melamina Blanca 19mm'))
+    expect(bajo.item.back?.materialId).toBe(idOf(materials, 'Trasera / MDF 3mm'))
+    expect(bajo.item.doors).toEqual({ count: 2, hinges: [{ hardwareId: idOf(hardware, '110°'), qty: 4 }] })
+  })
+
+  it('elige la guía según la profundidad', () => {
+    const { templates } = excelTemplates(materials, hardware)
+    expect(templates.find((t) => t.name === 'Placard 2 puertas con cajones')!.item.drawers.slideHardwareId).toBe(idOf(hardware, '550 DTC'))
+    expect(templates.find((t) => t.name === 'Sinfonier')!.item.drawers.slideHardwareId).toBe(idOf(hardware, '450 DTC'))
+  })
+
+  it('si falta algo del catálogo lo deja vacío y lo informa', () => {
+    const { templates, missing } = excelTemplates([], [])
+    expect(missing).toContain('Melamina Blanca 19mm (Estructura)')
+    expect(templates.every((t) => t.item.structure.materialId === null)).toBe(true)
+    for (const t of templates) expect(TemplateDataSchema.safeParse(t).success).toBe(true)
   })
 })

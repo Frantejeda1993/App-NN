@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, CopyPlus, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, CopyPlus, FileDown, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,16 @@ import {
 } from '@/domain/quoteLifecycle'
 import { FurnitureItemEditor, type CatalogRefs, type FurnitureDraft } from '@/features/furniture/FurnitureItemEditor'
 import { notifyError, notifyWrite } from '@/lib/notify'
-import { FurnitureItemSchema, ProjectDataSchema, QuoteDataSchema, type FurnitureItem, type QuoteData, type QuoteStatus } from '@/model'
+import {
+  FurnitureItemSchema,
+  ProjectDataSchema,
+  QuoteDataSchema,
+  type FurnitureItem,
+  type QuoteData,
+  type QuoteStatus,
+  type WorkshopSettings,
+} from '@/model'
+import { pdfFileName, quotePdfModel } from '@/domain/quotePdf'
 import { AdjustmentsEditor, Breakdown, FreeLinesEditor, QuoteSummary } from './QuoteParts'
 import { QUOTE_TONES, useQuoteCatalog } from './shared'
 
@@ -90,6 +99,7 @@ export function QuoteEditorPage() {
       clients={clients}
       templates={templates}
       validityDays={settings.settings.quoteValidityDays}
+      workshop={settings.settings}
     />
   )
 }
@@ -109,6 +119,7 @@ function Editor({
   clients,
   templates,
   validityDays,
+  workshop,
 }: {
   quote: Quote
   refs: CatalogRefs
@@ -118,6 +129,7 @@ function Editor({
   clients: Client[]
   templates: Template[]
   validityDays: number
+  workshop: WorkshopSettings
 }) {
   const api = useData()
   const me = useMyEmail()
@@ -216,6 +228,21 @@ function Editor({
     }
   }
 
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const downloadPdf = async () => {
+    if (pdfBusy) return
+    setPdfBusy(true)
+    try {
+      const model = quotePdfModel({ quote: draft, totals, catalog: maps, workshop, client: client ?? null, today })
+      const { downloadQuotePdf } = await import('./pdf')
+      await downloadQuotePdf(model, pdfFileName(draft, client?.name ?? null))
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
   const remove = () => {
     if (!window.confirm(`¿Eliminar el borrador "${draft.title}"? No se puede deshacer.`)) return
     notifyWrite(api.deleteQuote(quote.id), 'Presupuesto eliminado')
@@ -311,6 +338,9 @@ function Editor({
               {ACTION_LABELS[s]}
             </Button>
           ))}
+          <Button size="sm" variant="outline" onClick={downloadPdf} disabled={pdfBusy || itemEdit !== null}>
+            <FileDown /> {pdfBusy ? 'Generando…' : 'Descargar PDF'}
+          </Button>
           {draft.status !== 'borrador' && (
             <Button size="sm" variant="outline" onClick={newVersion}>
               <CopyPlus /> Nueva versión

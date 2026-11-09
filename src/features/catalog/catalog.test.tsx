@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { FakeDataApi } from '@/test/fakeApi'
 import { renderApp } from '@/test/renderApp'
+import { excelSeed } from '@/domain/catalog'
 
 async function fill(el: HTMLElement, v: string) {
   await userEvent.clear(el)
@@ -126,5 +127,26 @@ describe('plantillas de mueble', () => {
     const list = await screen.findByRole('list', { name: 'Plantillas' })
     await userEvent.click(within(list).getByRole('button', { name: /eliminar/i }))
     await waitFor(() => expect(api.templates.size).toBe(0))
+  })
+
+  it('carga las plantillas del Excel una sola vez, enlazadas al catálogo', async () => {
+    const api = new FakeDataApi()
+    const seed = excelSeed()
+    for (const m of seed.materials) api.createMaterial(m, 'nacho@gmail.com')
+    for (const h of seed.hardware) api.createHardware(h, 'nacho@gmail.com')
+    renderApp('/catalogo?tab=plantillas', api)
+
+    const btn = await screen.findByRole('button', { name: /cargar plantillas del excel/i })
+    await userEvent.click(btn)
+    const list = await screen.findByRole('list', { name: /plantillas/i })
+    expect(within(list).getByText('Bajo cocina 60')).toBeInTheDocument()
+    const count = api.templates.size
+    expect(count).toBeGreaterThanOrEqual(12)
+    const bajo = [...api.templates.values()].find((t) => t.name === 'Bajo cocina 60')!
+    expect(api.materials.get(bajo.item.structure.materialId!)?.name).toMatch(/melamina blanca 19mm/i)
+
+    await userEvent.click(btn)
+    expect(await screen.findByText(/ya estaban cargadas/i)).toBeInTheDocument()
+    expect(api.templates.size).toBe(count)
   })
 })

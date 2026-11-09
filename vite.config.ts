@@ -15,16 +15,16 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'favicon.ico', 'apple-touch-icon-180x180.png'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Taller NN',
         short_name: 'Taller',
         description: 'Gestión de proyectos, billetera y presupuestos del taller',
         lang: 'es',
         theme_color: '#78350f',
-        background_color: '#fafaf9',
+        background_color: '#efe7dc',
         display: 'standalone',
-        // Generados con `npx @vite-pwa/assets-generator --preset minimal-2023 public/icon.svg`
+        // Generados a partir del logo del taller (fondo crema #efe7dc; el maskable con margen de seguridad).
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },

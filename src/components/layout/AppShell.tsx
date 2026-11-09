@@ -1,4 +1,5 @@
 import { LogOut, Settings } from 'lucide-react'
+import { Brand } from './Brand'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuth } from '@/auth/AuthProvider'
@@ -31,8 +32,8 @@ export function AppShell() {
     <div className="min-h-dvh bg-background text-foreground md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
       {/* Menú lateral: PC / tablet */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-card md:flex">
-        <div className="px-5 py-5 text-lg font-semibold tracking-tight">
-          Taller <span className="text-primary">NN</span>
+        <div className="px-5 py-5 text-lg">
+          <Brand logoClassName="size-9" />
         </div>
         <nav aria-label="Principal" className="flex flex-1 flex-col gap-1 px-3">
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
@@ -68,9 +69,7 @@ export function AppShell() {
       <div className="flex min-h-dvh flex-col">
         {/* Cabecera: celular */}
         <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
-          <span className="font-semibold">
-            Taller <span className="text-primary">NN</span>
-          </span>
+          <Brand />
           <div className="flex">
             <Link to="/ajustes" aria-label="Ajustes" className={buttonVariants({ variant: 'ghost', size: 'icon' })}>
               <Settings />

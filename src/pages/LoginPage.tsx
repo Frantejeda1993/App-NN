@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/auth/AuthProvider'
+import { Logo } from '@/components/layout/Brand'
 import { Button } from '@/components/ui/button'
 
 export function LoginPage() {
@@ -25,6 +26,7 @@ export function LoginPage() {
   return (
     <div className="grid min-h-dvh place-items-center bg-background px-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 shadow-sm">
+        <Logo className="mb-4 size-20 rounded-xl" />
         <h1 className="text-2xl font-semibold tracking-tight">
           Taller <span className="text-primary">NN</span>
         </h1>

@@ -5,7 +5,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, Field, Input } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
 import { useEdgeBanding, useHardware, useMaterials, useServiceRates, useTemplates } from '@/data/hooks'
-import { excelSeed, pricePerM2Cents } from '@/domain/catalog'
+import { excelSeed, excelTemplates, pricePerM2Cents } from '@/domain/catalog'
 import { formatEuros, parseEuros } from '@/domain/money'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
@@ -261,15 +261,45 @@ function RatesForm({ state }: { state: { rates: ServiceRates; exists: boolean } 
 
 function TemplatesTab() {
   const api = useData()
+  const me = useMyEmail()
   const templates = useTemplates()
-  if (!templates) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  const materials = useMaterials()
+  const hardware = useHardware()
+  const [seeding, setSeeding] = useState(false)
+  if (!templates || !materials || !hardware) return <p className="text-sm text-muted-foreground">Cargando…</p>
+
+  // Carga las plantillas comunes del Excel que todavía no existan (por nombre).
+  const seedTemplates = () => {
+    if (seeding) return
+    setSeeding(true)
+    try {
+      const { templates: seed, missing } = excelTemplates(materials, hardware)
+      const existing = new Set(templates.map((t) => t.name.trim().toLowerCase()))
+      const fresh = seed.filter((t) => !existing.has(t.name.toLowerCase()))
+      for (const t of fresh) api.createTemplate(t, me).committed.catch(notifyError)
+      notifyWrite(
+        { id: 'seed-templates', committed: Promise.resolve() },
+        fresh.length === 0 ? 'Las plantillas del Excel ya estaban cargadas' : `Cargadas ${fresh.length} plantillas del Excel`,
+      )
+      if (fresh.length > 0 && missing.length > 0) {
+        notifyError(new Error(`Faltan en el catálogo (quedaron sin asignar): ${missing.join(', ')}`))
+      }
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setSeeding(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Link to="/catalogo/plantillas/nueva" className={buttonVariants()}>
           <Plus /> Nueva plantilla
         </Link>
+        <Button variant="outline" onClick={seedTemplates} disabled={seeding}>
+          Cargar plantillas del Excel
+        </Button>
       </div>
       <Card>
         <h2 className="mb-2 font-semibold">Plantillas de mueble</h2>
