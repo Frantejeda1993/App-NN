@@ -189,6 +189,18 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
       )
     },
 
+    watchQuote(id, cb) {
+      return onSnapshot(doc(db, COLLECTIONS.quotes, id), (snap) => cb(toStored(QuoteDataSchema, snap)), onError('presupuesto'))
+    },
+
+    createQuote: (input, by) => createDocument(db, COLLECTIONS.quotes, QuoteDataSchema, input, by),
+    updateQuote: (id, next, by) => updateDocument(db, COLLECTIONS.quotes, id, QuoteDataSchema, next, by),
+    deleteQuote(id) {
+      const committed = deleteDoc(doc(db, COLLECTIONS.quotes, id))
+      committed.catch(() => {})
+      return { id, committed }
+    },
+
     watchGeneralExpenses(cb) {
       return onSnapshot(
         collection(db, COLLECTIONS.generalExpenses),

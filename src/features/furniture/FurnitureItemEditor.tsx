@@ -1,9 +1,10 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import type { EdgeBanding, Hardware, Material } from '@/data/api'
-import { formatEuros, parseEuros } from '@/domain/money'
+import { MoneyInput } from '@/components/ui/money-input'
+import { formatEuros } from '@/domain/money'
 import type { FurnitureItem } from '@/model'
 
 /** Lo que se edita de un mueble (en plantillas no hay id ni aceptación). */
@@ -241,42 +242,6 @@ function NumInput({ id, value, onChange, decimal }: { id: string; value: number;
       step={decimal ? '0.1' : '1'}
       value={Number.isFinite(value) ? value : ''}
       onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-    />
-  )
-}
-
-/** Importe en € con coma; guarda céntimos (o null si está vacío y `nullable`). */
-function MoneyInput({
-  id,
-  cents,
-  onChange,
-  nullable,
-}: {
-  id: string
-  cents: number | null
-  onChange: (c: number | null) => void
-  nullable?: boolean
-}) {
-  const fmt = (c: number | null) => (c === null ? '' : formatEuros(c).replace(/\s?€/, ''))
-  // Mientras se escribe se muestra lo tecleado; si no tiene foco, siempre el valor
-  // real (así se actualiza si cambia desde afuera: plantilla cargada, otro mueble…).
-  const [editing, setEditing] = useState<string | null>(null)
-  return (
-    <Input
-      id={id}
-      inputMode="decimal"
-      placeholder={nullable ? 'Sugerida' : '0,00'}
-      value={editing ?? fmt(cents)}
-      onFocus={() => setEditing(fmt(cents))}
-      onChange={(e) => {
-        setEditing(e.target.value)
-        if (e.target.value.trim() === '') onChange(nullable ? null : 0)
-        else {
-          const c = parseEuros(e.target.value)
-          if (c !== null && c >= 0) onChange(c)
-        }
-      }}
-      onBlur={() => setEditing(null)}
     />
   )
 }

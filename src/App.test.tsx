@@ -57,11 +57,11 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /hola, nacho/i })).toBeInTheDocument()
   })
 
-  it('las secciones de negocio muestran "Próximamente"', async () => {
+  it('la sección de presupuestos ya no es "Próximamente"', async () => {
     const { emit } = setup(['nacho@gmail.com'], '/presupuestos')
     await act(async () => emit(nacho))
     expect(screen.getByRole('heading', { name: 'Presupuestos' })).toBeInTheDocument()
-    expect(screen.getByText(/próximamente/i)).toBeInTheDocument()
+    expect(screen.queryByText(/próximamente/i)).not.toBeInTheDocument()
   })
 
   it('una ruta desconocida vuelve al inicio', async () => {

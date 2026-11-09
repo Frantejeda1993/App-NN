@@ -1,11 +1,14 @@
 import { ArrowLeft, FileText, MessageCircle, Pencil } from 'lucide-react'
 import { ProjectMovements } from '@/features/wallet/ProjectMovements'
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge, Card, Select } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
-import { useClient, useClients, useMembers } from '@/data/hooks'
+import { useClient, useClients, useMembers, useQuotes, useWorkshopSettings } from '@/data/hooks'
+import type { Project } from '@/data/api'
+import { STATUS_LABELS as QUOTE_STATUS_LABELS } from '@/domain/quoteLifecycle'
+import { QUOTE_TONES, startQuote } from '@/features/quotes/shared'
 import { whatsappLink } from '@/domain/clients'
 import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
 import { formatEuros } from '@/domain/money'
@@ -214,10 +217,7 @@ export function ProjectDetailPage() {
           <h2 className="mb-2 flex items-center gap-2 font-semibold">
             <FileText className="size-4" aria-hidden /> Presupuestos
           </h2>
-          <p className="text-sm text-muted-foreground">Los presupuestos vinculados aparecerán acá.</p>
-          <Button className="mt-3" variant="outline" disabled title="Disponible en el paso 9">
-            Crear presupuesto (próximamente)
-          </Button>
+          <ProjectQuotes project={project} />
         </Card>
       </div>
       <ProjectMovements projectId={project.id} estimatedCostCents={project.estimatedCostCents} />
@@ -231,5 +231,55 @@ function DateRow({ label, value }: { label: string; value: string | null }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{value ? formatDateEs(value) : '—'}</dd>
     </div>
+  )
+}
+
+function ProjectQuotes({ project }: { project: Project }) {
+  const api = useData()
+  const me = useMyEmail()
+  const navigate = useNavigate()
+  const quotes = useQuotes()
+  const settings = useWorkshopSettings()
+  const mine = (quotes ?? []).filter((q) => q.projectId === project.id)
+  return (
+    <>
+      {quotes === undefined ? (
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : mine.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Todavía no hay presupuestos para este proyecto.</p>
+      ) : (
+        <ul aria-label="Presupuestos del proyecto" className="flex flex-col divide-y divide-border text-sm">
+          {mine.map((q) => (
+            <li key={q.id}>
+              <Link to={`/presupuestos/${q.id}`} className="flex items-center justify-between gap-2 py-2 hover:text-primary">
+                <span className="min-w-0 truncate">
+                  {q.title} <span className="text-muted-foreground">v{q.version}</span>
+                  {project.acceptedQuoteId === q.id && <span className="ml-1 text-xs text-primary">(aceptado)</span>}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="tabular-nums">{formatEuros(q.totals.totalCents)}</span>
+                  <Badge tone={QUOTE_TONES[q.status]}>{QUOTE_STATUS_LABELS[q.status]}</Badge>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Button
+        className="mt-3"
+        variant="outline"
+        disabled={!settings}
+        onClick={() => {
+          if (!settings) return
+          try {
+            navigate(`/presupuestos/${startQuote(api, me, project, settings.settings)}`)
+          } catch (e) {
+            notifyError(e)
+          }
+        }}
+      >
+        Crear presupuesto
+      </Button>
+    </>
   )
 }

@@ -10,11 +10,12 @@ import { ClientsListPage } from '@/features/clients/ClientsListPage'
 import { ProjectDetailPage } from '@/features/projects/ProjectDetailPage'
 import { ProjectNewPage } from '@/features/projects/ProjectNewPage'
 import { ProjectsListPage } from '@/features/projects/ProjectsListPage'
+import { QuoteEditorPage } from '@/features/quotes/QuoteEditorPage'
+import { QuotesListPage } from '@/features/quotes/QuotesListPage'
 import { GeneralExpenseFormPage } from '@/features/wallet/GeneralExpenseFormPage'
 import { MovementDetailPage } from '@/features/wallet/MovementDetailPage'
 import { MovementNewPage } from '@/features/wallet/MovementNewPage'
 import { WalletPage } from '@/features/wallet/WalletPage'
-import { ComingSoonPage } from '@/pages/ComingSoonPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { SettingsPage } from '@/pages/SettingsPage'
@@ -47,7 +48,8 @@ export function AppRoutes() {
         <Route path="billetera/movimientos/:id" element={<MovementDetailPage />} />
         <Route path="billetera/gastos/nuevo" element={<GeneralExpenseFormPage />} />
         <Route path="billetera/gastos/:id" element={<GeneralExpenseFormPage />} />
-        <Route path="presupuestos" element={<ComingSoonPage title="Presupuestos" />} />
+        <Route path="presupuestos" element={<QuotesListPage />} />
+        <Route path="presupuestos/:id" element={<QuoteEditorPage />} />
         <Route path="catalogo" element={<CatalogPage />} />
         <Route path="catalogo/plantillas/nueva" element={<TemplateEditorPage />} />
         <Route path="catalogo/plantillas/:id" element={<TemplateEditorPage />} />

@@ -90,6 +90,11 @@ export function useQuotes(): Quote[] | undefined {
   return useLive<Quote[]>((cb) => api.watchQuotes(cb), [])
 }
 
+export function useQuote(id: string): Quote | null | undefined {
+  const api = useData()
+  return useLive<Quote | null>((cb) => (id ? api.watchQuote(id, cb) : none(cb)), [id])
+}
+
 export function useGeneralExpenses(): GeneralExpense[] | undefined {
   const api = useData()
   return useLive<GeneralExpense[]>((cb) => api.watchGeneralExpenses(cb), [])

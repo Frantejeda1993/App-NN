@@ -19,6 +19,7 @@ import {
   type ServiceRates,
   type Stored,
   type TemplateData,
+  type QuoteData,
   type BoxData,
   type MovementData,
   WorkshopSettingsSchema,
@@ -223,7 +224,7 @@ export class FakeDataApi implements DataApi {
     return this.done(id)
   }
 
-  // ---- presupuestos (solo lectura por ahora) ----
+  // ---- presupuestos ----
   quotes = new Map<string, Quote>()
 
   seedQuote(input: Record<string, unknown>, id = `q${++this.seq}`): Quote {
@@ -235,6 +236,27 @@ export class FakeDataApi implements DataApi {
 
   watchQuotes(cb: (q: Quote[]) => void) {
     return this.watch(() => cb([...this.quotes.values()]))
+  }
+
+  watchQuote(id: string, cb: (q: Quote | null) => void) {
+    return this.watch(() => cb(this.quotes.get(id) ?? null))
+  }
+
+  createQuote(input: unknown, by: string) {
+    const id = `q${++this.seq}`
+    this.quotes.set(id, { ...QuoteDataSchema.parse(input), ...this.stamp(by), id })
+    return this.done(id)
+  }
+
+  updateQuote(id: string, next: QuoteData, by: string) {
+    const prev = this.quotes.get(id)!
+    this.quotes.set(id, { ...QuoteDataSchema.parse(next), ...this.stamp(by, prev), id })
+    return this.done(id)
+  }
+
+  deleteQuote(id: string) {
+    this.quotes.delete(id)
+    return this.done(id)
   }
 
   // ---- gastos generales ----

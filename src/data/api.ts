@@ -23,6 +23,7 @@ import type {
   ProjectData,
   ProjectDataSchema,
   QuoteData,
+  QuoteDataSchema,
   Stored,
   WorkshopSettings,
 } from '@/model'
@@ -89,8 +90,14 @@ export interface DataApi {
   createBox(input: z.input<typeof BoxDataSchema>, by: string): WriteResult
   updateBox(id: string, next: BoxData, by: string): WriteResult
 
-  /** Presupuestos (por ahora solo lectura; el editor llega en el paso 9). */
+  // ---- presupuestos ----
   watchQuotes(cb: (quotes: Quote[]) => void): Unsubscribe
+  watchQuote(id: string, cb: (quote: Quote | null) => void): Unsubscribe
+  createQuote(input: z.input<typeof QuoteDataSchema>, by: string): WriteResult
+  /** `next` es el presupuesto completo (no un parche). */
+  updateQuote(id: string, next: QuoteData, by: string): WriteResult
+  /** Solo borradores (las reglas lo exigen); el resto se archiva. */
+  deleteQuote(id: string): WriteResult
   watchGeneralExpenses(cb: (expenses: GeneralExpense[]) => void): Unsubscribe
   createGeneralExpense(input: z.input<typeof GeneralExpenseDataSchema>, by: string): WriteResult
   /** `next` es el gasto completo (no un parche). */
