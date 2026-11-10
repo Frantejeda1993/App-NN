@@ -23,7 +23,8 @@ async function toDataUrl(url: string): Promise<string | null> {
   }
 }
 
-export async function downloadQuotePdf(model: QuotePdfModel, fileName: string): Promise<void> {
+/** `image3d`: imagen PNG (data URL) de los muebles en 3D, opcional. */
+export async function downloadQuotePdf(model: QuotePdfModel, fileName: string, image3d: string | null = null): Promise<void> {
   const [{ jsPDF }, { autoTable }, logo] = await Promise.all([import('jspdf'), import('jspdf-autotable'), toDataUrl(logoUrl)])
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = doc.internal.pageSize.getWidth()
@@ -130,6 +131,23 @@ export async function downloadQuotePdf(model: QuotePdfModel, fileName: string): 
     doc.text(body, M, y + 5)
     y += 5 + body.length * 4.4
   }
+  // ---- vista 3D de los muebles (opcional) ----
+  if (image3d) {
+    const imgW = W - 2 * M
+    const imgH = (imgW * 800) / 1400
+    ensure(imgH + 12)
+    y += 4
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(...WALNUT)
+    doc.text('VISTA 3D (ORIENTATIVA)', M, y)
+    doc.setDrawColor(230, 225, 218)
+    doc.setLineWidth(0.2)
+    doc.addImage(image3d, 'PNG', M, y + 3, imgW, imgH)
+    doc.rect(M, y + 3, imgW, imgH)
+    y += 3 + imgH + 2
+  }
+
   block('CONDICIONES DE PAGO Y PLAZO', model.terms)
   block('OBSERVACIONES', model.notes)
 

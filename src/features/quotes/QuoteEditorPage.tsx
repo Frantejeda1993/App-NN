@@ -1,5 +1,5 @@
-import { ArrowLeft, Copy, CopyPlus, FileDown, Pencil, Plus, Save, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowLeft, Box, Copy, CopyPlus, FileDown, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
@@ -23,6 +23,7 @@ import {
   nextStatuses,
   projectPatchForQuote,
 } from '@/domain/quoteLifecycle'
+import { Furniture3DView } from '@/features/furniture/Furniture3DView'
 import { FurnitureItemEditor, type CatalogRefs, type FurnitureDraft } from '@/features/furniture/FurnitureItemEditor'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import {
@@ -148,6 +149,10 @@ function Editor({
   const [lastWritten, setLastWritten] = useState<string | null>(null)
   const [itemEdit, setItemEdit] = useState<ItemEdit | null>(null)
   const [openItem, setOpenItem] = useState<string | null>(null)
+  // Pestaña de la ventana del mueble y vista 3D (un mueble o todos).
+  const [itemTab, setItemTab] = useState<'datos' | '3d'>('datos')
+  const [view3d, setView3d] = useState<{ title: string; items: { key: string; label?: string; item: FurnitureItem }[] } | null>(null)
+  const materialName = useCallback((id: string | null) => (id ? maps.materials.get(id)?.name : undefined), [maps])
 
   const serverMs = msOf(quote)
   if (serverMs !== baseMs) {
@@ -237,13 +242,20 @@ function Editor({
   }
 
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfWith3d, setPdfWith3d] = useState(true)
   const downloadPdf = async () => {
     if (pdfBusy) return
     setPdfBusy(true)
     try {
       const model = quotePdfModel({ quote: draft, totals, catalog: maps, workshop, client: client ?? null, today })
-      const { downloadQuotePdf } = await import('./pdf')
-      await downloadQuotePdf(model, pdfFileName(draft, client?.name ?? null))
+      const shown = draft.status === 'borrador' ? draft.items : draft.items.filter((i) => i.accepted)
+      const [{ downloadQuotePdf }, image3d] = await Promise.all([
+        import('./pdf'),
+        pdfWith3d && shown.length > 0
+          ? import('@/features/furniture/render3d').then((r) => r.renderFurniturePng(shown, materialName))
+          : Promise.resolve(null),
+      ])
+      await downloadQuotePdf(model, pdfFileName(draft, client?.name ?? null), image3d)
     } catch (e) {
       notifyError(e)
     } finally {
@@ -258,7 +270,10 @@ function Editor({
   }
 
   // ---- muebles ----
-  const startItem = (item: FurnitureItem, index: number | null) => setItemEdit({ index, item: structuredClone(item), errors: {} })
+  const startItem = (item: FurnitureItem, index: number | null) => {
+    setItemTab('datos')
+    setItemEdit({ index, item: structuredClone(item), errors: {} })
+  }
   const blankItem = () =>
     startItem(
       {
@@ -346,9 +361,16 @@ function Editor({
               {ACTION_LABELS[s]}
             </Button>
           ))}
-          <Button size="sm" variant="outline" onClick={downloadPdf} disabled={pdfBusy || itemEdit !== null}>
-            <FileDown /> {pdfBusy ? 'Generando…' : 'Descargar PDF'}
-          </Button>
+          <div className="flex items-center gap-2 rounded-md border border-border px-2">
+            <Button size="sm" variant="ghost" className="-mx-1" onClick={downloadPdf} disabled={pdfBusy || itemEdit !== null}>
+              <FileDown /> {pdfBusy ? 'Generando…' : 'Descargar PDF'}
+            </Button>
+            {draft.items.length > 0 && (
+              <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                <input type="checkbox" checked={pdfWith3d} onChange={(e) => setPdfWith3d(e.target.checked)} /> Incluir vista 3D
+              </label>
+            )}
+          </div>
           {draft.status !== 'borrador' && (
             <Button size="sm" variant="outline" onClick={newVersion}>
               <CopyPlus /> Nueva versión
@@ -429,7 +451,24 @@ function Editor({
 
           <Card>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold">Muebles</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold">Muebles</h2>
+                {draft.items.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      const shown = draft.status === 'borrador' ? draft.items : draft.items.filter((i) => i.accepted)
+                      setView3d({
+                        title: draft.status === 'borrador' ? 'Todos los muebles' : 'Muebles aceptados',
+                        items: shown.map((i) => ({ key: i.id, label: `${i.quantity > 1 ? `${i.quantity} × ` : ''}${i.name}`, item: i })),
+                      })
+                    }}
+                  >
+                    <Box /> Ver todos en 3D
+                  </Button>
+                )}
+              </div>
               {editable && (
                 <div className="flex flex-wrap gap-2">
                   {activeTemplates.length > 0 && (
@@ -502,6 +541,9 @@ function Editor({
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="mr-2 text-sm font-medium tabular-nums">{formatEuros(b?.totalCents ?? 0)}</span>
+                        <Button size="icon" variant="ghost" aria-label={`Ver ${it.name} en 3D`} onClick={() => setView3d({ title: it.name, items: [{ key: it.id, item: it }] })}>
+                          <Box />
+                        </Button>
                         {editable && (
                           <>
                             <Button size="icon" variant="ghost" aria-label={`Editar ${it.name}`} onClick={() => startItem(it, i)}>
@@ -583,7 +625,31 @@ function Editor({
               }
             >
               {itemEdit && (
+                <div role="tablist" aria-label="Vista del mueble" className="mb-4 flex gap-1">
+                  {(['datos', '3d'] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      role="tab"
+                      aria-selected={itemTab === t}
+                      onClick={() => setItemTab(t)}
+                      className={
+                        itemTab === t
+                          ? 'rounded-full bg-primary px-3 py-1 text-sm text-primary-foreground'
+                          : 'rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground hover:text-foreground'
+                      }
+                    >
+                      {t === 'datos' ? 'Datos' : 'Vista 3D'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {itemEdit && itemTab === '3d' && (
+                <Furniture3DView className="h-[60dvh]" items={[{ key: 'edit', item: itemEdit.item }]} materialName={materialName} />
+              )}
+              {itemEdit && (
                 <form
+                  hidden={itemTab !== 'datos'}
                   id="qi-form"
                   noValidate
                   className="flex flex-col gap-4"
@@ -617,6 +683,10 @@ function Editor({
                   </div>
                 </form>
               )}
+            </Dialog>
+
+            <Dialog open={view3d !== null} onClose={() => setView3d(null)} title={view3d ? `Vista 3D: ${view3d.title}` : ''}>
+              {view3d && <Furniture3DView className="h-[70dvh]" items={view3d.items} materialName={materialName} />}
             </Dialog>
           </Card>
 

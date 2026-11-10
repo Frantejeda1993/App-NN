@@ -40,8 +40,12 @@ export function Dialog({
     const previous = document.activeElement as HTMLElement | null
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    // Foco en el primer campo (no en la ✕).
-    const first = panel.current?.querySelector<HTMLElement>(`[data-dialog-body] :is(${FOCUSABLE})`) ?? panel.current
+    // Foco en el primer campo del formulario; si no hay, en lo primero enfocable (nunca en la ✕).
+    const body = panel.current?.querySelector<HTMLElement>('[data-dialog-body]')
+    const first =
+      body?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])') ??
+      body?.querySelector<HTMLElement>(FOCUSABLE) ??
+      panel.current
     first?.focus()
 
     const onKey = (e: KeyboardEvent) => {

@@ -42,9 +42,9 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
-  // jsPDF se importa recién al pulsar "Descargar PDF": se pre-empaqueta al arrancar
+  // jsPDF y three.js se importan recién al usarlos: se pre-empaquetan al arrancar
   // para que el servidor de desarrollo no recargue la página en ese momento.
-  optimizeDeps: { include: ['jspdf', 'jspdf-autotable'] },
+  optimizeDeps: { include: ['jspdf', 'jspdf-autotable', 'three', '@react-three/fiber', '@react-three/drei'] },
   build: {
     rollupOptions: {
       output: {

@@ -238,4 +238,27 @@ describe('presupuestos', () => {
     expect(screen.getByRole('dialog', { name: /editar mueble: caja/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre del mueble/i)).toHaveValue('Caja')
   })
+
+  it('vista 3D: de un mueble, de todos y como pestaña al editar', async () => {
+    const { api } = setup()
+    const q = api.seedQuote({ title: 'Cocina', items: [item(), item({ id: 'i2', name: 'Alto 100' })] })
+    renderApp(`/presupuestos/${q.id}`, api)
+
+    await userEvent.click(await screen.findByRole('button', { name: /ver bajo 100 en 3d/i }))
+    const one = screen.getByRole('dialog', { name: /vista 3d: bajo 100/i })
+    // jsdom no tiene WebGL: se avisa en lugar de romper.
+    expect(within(one).getByRole('img', { name: /vista 3d/i })).toHaveTextContent(/no puede mostrar la vista 3d/i)
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(screen.getByRole('button', { name: /ver todos en 3d/i }))
+    expect(screen.getByRole('dialog', { name: /vista 3d: todos los muebles/i })).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(screen.getByRole('button', { name: /editar bajo 100/i }))
+    await userEvent.click(screen.getByRole('tab', { name: /vista 3d/i }))
+    expect(within(screen.getByRole('dialog')).getByRole('img', { name: /vista 3d/i })).toBeInTheDocument()
+    // El formulario sigue vivo: se puede guardar desde la pestaña 3D.
+    await userEvent.click(screen.getByRole('button', { name: /guardar mueble/i }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
