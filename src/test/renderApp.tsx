@@ -19,6 +19,7 @@ export function renderApp(path: string, api = new FakeDataApi(), user: AuthUser 
     signIn: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
     isMember: vi.fn(async () => true),
+    watchMembership: () => () => {},
   }
   const utils = render(
     <AuthProvider service={auth}>

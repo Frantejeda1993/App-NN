@@ -32,7 +32,8 @@ export const nullableId = idSchema.nullable().default(null)
 
 export const nameSchema = z.string().trim().min(1, 'Obligatorio').max(200)
 export const textSchema = z.string().max(5000).default('')
-export const urlSchema = z.union([z.url(), z.literal('')]).default('')
+// Solo http(s): un enlace guardado nunca puede ser javascript:, data:, etc.
+export const urlSchema = z.union([z.url({ protocol: /^https?$/, error: 'Debe ser un enlace web (http o https)' }), z.literal('')]).default('')
 
 /**
  * Reparto en bp entre socios (por email) y el taller ("taller"). Debe sumar 100 %.

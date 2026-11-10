@@ -86,6 +86,59 @@ beforeEach(async () => {
   })
 })
 
+// Todas las colecciones: quien no es socio activo con email verificado no lee,
+// no lista y no crea nada. El socio activo sí lee (la prueba no es vacía).
+describe('matriz de acceso por colección', () => {
+  const PATHS = [
+    'clients/c1',
+    'clients/c1/contacts/k1',
+    'projects/p1',
+    'boxes/b1',
+    'generalExpenses/g1',
+    'movements/m1',
+    'auditLog/m1_v1',
+    'settings/workshop',
+    'quotes/q1',
+    'templates/t1',
+    'catalogMaterials/x1',
+    'catalogEdgeBanding/x1',
+    'catalogHardware/x1',
+  ]
+  const BAJA = 'baja@gmail.com'
+  const actors: [string, () => Firestore][] = [
+    ['alguien fuera de la lista', () => dbAs('extrano@gmail.com')],
+    ['un socio desactivado', () => dbAs(BAJA)],
+    ['un socio con el email sin verificar', () => env.authenticatedContext(NACHO, { email: NACHO, email_verified: false }).firestore() as unknown as Firestore],
+    ['sin sesión', () => dbAs(null)],
+  ]
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await setDoc(doc(db, `members/${BAJA}`), { name: 'Baja', active: false })
+      for (const p of PATHS) await setDoc(doc(db, p), { name: 'x', title: 'x', ...stamp(NACHO) })
+    })
+  })
+
+  it('el socio activo lee todas', async () => {
+    for (const p of PATHS) await assertSucceeds(getDoc(doc(dbAs(NACHO), p)))
+  })
+
+  for (const [who, db] of actors) {
+    it(`${who} no lee, no lista ni crea en ninguna`, async () => {
+      for (const p of PATHS) {
+        const parent = p.split('/').slice(0, -1).join('/')
+        await assertFails(getDoc(doc(db(), p)))
+        await assertFails(getDocs(collection(db(), parent)))
+        await assertFails(setDoc(doc(db(), `${parent}/nuevo`), { name: 'x', title: 'x', ...stamp(NACHO) }))
+      }
+      // Tampoco ve a los demás socios.
+      await assertFails(getDoc(doc(db(), `members/${NAHUEL}`)))
+      await assertFails(getDocs(collection(db(), 'members')))
+    })
+  }
+})
+
 describe('acceso general', () => {
   it('un no socio no puede leer ni crear datos de negocio', async () => {
     const db = dbAs('extrano@gmail.com')

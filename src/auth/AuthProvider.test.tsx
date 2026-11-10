@@ -6,7 +6,8 @@ import type { AuthService, AuthUser } from './types'
 
 function createFakeService(members: string[]) {
   let listener: ((u: AuthUser | null) => void) | null = null
-  const service: AuthService & { emit: (u: AuthUser | null) => void } = {
+  let membership: ((active: boolean) => void) | null = null
+  const service: AuthService & { emit: (u: AuthUser | null) => void; setActive: (active: boolean) => void; watching: () => boolean } = {
     onUserChanged(cb) {
       listener = cb
       return () => {
@@ -18,6 +19,16 @@ function createFakeService(members: string[]) {
       listener?.(null)
     }),
     isMember: vi.fn(async (email: string) => members.includes(email.toLowerCase())),
+    watchMembership: vi.fn((_email: string, cb: (active: boolean) => void) => {
+      membership = cb
+      return () => {
+        membership = null
+      }
+    }),
+    setActive(active) {
+      membership?.(active)
+    },
+    watching: () => membership !== null,
     emit(u) {
       listener?.(u)
     },
@@ -164,5 +175,54 @@ describe('AuthProvider', () => {
     await act(async () => svc.emit(nacho))
     await userEvent.click(screen.getByText('salir'))
     expect(screen.getByTestId('status')).toHaveTextContent('signedOut')
+  })
+
+  it('si desactivan al socio con la sesión abierta, lo saca y borra los datos del dispositivo', async () => {
+    const svc = createFakeService(['nacho@gmail.com'])
+    render(
+      <AuthProvider service={svc}>
+        <Probe />
+      </AuthProvider>,
+    )
+    await act(async () => svc.emit(nacho))
+    expect(screen.getByTestId('status')).toHaveTextContent('member')
+    expect(svc.watchMembership).toHaveBeenCalledWith('nacho@gmail.com', expect.any(Function))
+
+    await act(async () => svc.setActive(false))
+    expect(svc.signOut).toHaveBeenCalledWith({ clearLocalData: true })
+    expect(screen.getByTestId('status')).toHaveTextContent('notMember')
+    expect(screen.getByTestId('email')).toHaveTextContent('nacho@gmail.com')
+    // Se recuerda para mostrar el aviso tras la recarga que hace el borrado.
+    expect(sessionStorage.getItem('nn:revoked')).toBe('nacho@gmail.com')
+    expect(svc.watching()).toBe(false)
+  })
+
+  it('el aviso de acceso revocado sobrevive a la recarga y se limpia al volver a entrar', async () => {
+    sessionStorage.setItem('nn:revoked', 'nacho@gmail.com')
+    const svc = createFakeService(['nacho@gmail.com'])
+    render(
+      <AuthProvider service={svc}>
+        <Probe />
+      </AuthProvider>,
+    )
+    await act(async () => svc.emit(null))
+    expect(screen.getByTestId('status')).toHaveTextContent('notMember')
+    expect(screen.getByTestId('email')).toHaveTextContent('nacho@gmail.com')
+
+    await userEvent.click(screen.getByText('entrar'))
+    expect(sessionStorage.getItem('nn:revoked')).toBeNull()
+  })
+
+  it('mientras sigue activo no hace nada', async () => {
+    const svc = createFakeService(['nacho@gmail.com'])
+    render(
+      <AuthProvider service={svc}>
+        <Probe />
+      </AuthProvider>,
+    )
+    await act(async () => svc.emit(nacho))
+    await act(async () => svc.setActive(true))
+    expect(svc.signOut).not.toHaveBeenCalled()
+    expect(screen.getByTestId('status')).toHaveTextContent('member')
   })
 })

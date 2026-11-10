@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/form'
 import { formatEuros } from '@/domain/money'
 import { formatQty, orderText, type ShoppingList } from '@/domain/shopping'
 import { notifyError } from '@/lib/notify'
+import { safeHref } from '@/lib/utils'
 
 /**
  * Lista de compras del presupuesto aceptado: por proveedor, con "comprado"
@@ -84,8 +85,8 @@ export function ShoppingListCard({
                         <label className="flex min-w-0 items-center gap-2">
                           <input type="checkbox" checked={isBought} onChange={(e) => onTogglePurchased(l.key, e.target.checked)} />
                           <span className={isBought ? 'truncate text-muted-foreground line-through' : 'truncate'}>{l.name}</span>
-                          {l.url && (
-                            <a href={l.url} target="_blank" rel="noopener noreferrer" aria-label={`Ver ${l.name} en la web`} className="text-muted-foreground hover:text-primary">
+                          {safeHref(l.url) && (
+                            <a href={safeHref(l.url)} target="_blank" rel="noopener noreferrer" aria-label={`Ver ${l.name} en la web`} className="text-muted-foreground hover:text-primary">
                               <ExternalLink className="size-3.5" />
                             </a>
                           )}

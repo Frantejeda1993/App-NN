@@ -7,11 +7,24 @@ import { createFirebaseAuthService } from './auth/firebaseAuthService'
 import { DataProvider } from './data/DataProvider'
 import { createFirestoreDataApi } from './data/firestoreApi'
 import { getFirebase, missingFirebaseEnv } from './lib/firebase'
+import { isFramed } from './lib/frameGuard'
 import './index.css'
 
 const root = createRoot(document.getElementById('root')!)
 
-if (missingFirebaseEnv.length > 0) {
+if (isFramed()) {
+  // Dentro de otra página: no se inicia Firebase ni se muestra el login.
+  root.render(
+    <div style={{ padding: 24, fontFamily: 'system-ui' }}>
+      <p>
+        Por seguridad, Taller NN no se puede usar dentro de otra página.{' '}
+        <a href={window.location.href} target="_blank" rel="noopener noreferrer">
+          Abrir en una pestaña nueva
+        </a>
+      </p>
+    </div>,
+  )
+} else if (missingFirebaseEnv.length > 0) {
   root.render(
     <div style={{ padding: 24, fontFamily: 'system-ui' }}>
       <h1>Falta la configuración de Firebase</h1>

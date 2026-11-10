@@ -46,6 +46,8 @@ Cada push a `main` corre lint, typecheck y tests (incluidas las reglas), y si to
 
 ## Seguridad y datos
 
+Resumen completo, riesgos aceptados y checklist de la consola en [SECURITY.md](SECURITY.md).
+
 La app no tiene backend propio: **`firestore.rules` es la única barrera real**. La app valida todo con zod (`src/model`), pero las reglas son las que deciden qué se puede leer y escribir.
 
 - **Socios:** solo un socio activo (`members/{email}` con `active: true`) puede leer o escribir. Los ids de `members` tienen que estar **en minúsculas**: un id con mayúsculas nunca da acceso.

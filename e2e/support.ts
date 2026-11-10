@@ -97,3 +97,8 @@ export async function seedProject(id = 'p1', title = 'Cocina Ana') {
   })
   return id
 }
+
+/** Activa o desactiva un socio desde "la consola" (token owner del emulador). */
+export async function setMemberActive(email: string, active: boolean) {
+  await put(`members/${email}`, { name: email.split('@')[0], active })
+}

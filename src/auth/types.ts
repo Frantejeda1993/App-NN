@@ -15,6 +15,11 @@ export interface AuthService {
   /** `clearLocalData`: borra la caché offline de Firestore del dispositivo. */
   signOut(options?: { clearLocalData?: boolean }): Promise<void>
   isMember(email: string): Promise<boolean>
+  /**
+   * Vigila en vivo el propio registro de socio: `active` false si lo
+   * desactivan o lo borran mientras la sesión está abierta.
+   */
+  watchMembership(email: string, cb: (active: boolean) => void): () => void
 }
 
 export type AuthStatus = 'loading' | 'signedOut' | 'notMember' | 'member' | 'error'

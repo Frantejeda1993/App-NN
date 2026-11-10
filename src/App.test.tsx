@@ -18,6 +18,7 @@ function setup(members: string[], path = '/') {
     signIn: vi.fn(async () => {}),
     signOut: vi.fn(async () => listener?.(null)),
     isMember: vi.fn(async (e: string) => members.includes(e)),
+    watchMembership: () => () => {},
   }
   render(
     <AuthProvider service={svc}>

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { urlSchema } from './common'
+import { safeHref } from '@/lib/utils'
 import {
   ClientDataSchema,
   ContactDataSchema,
@@ -217,5 +219,23 @@ describe('presupuestos', () => {
   it('los ids de muebles deben ser únicos', () => {
     const item = { id: 'f1', name: 'A', widthMm: 1, heightMm: 1, depthMm: 1 }
     expect(QuoteDataSchema.safeParse({ title: 'x', items: [item, item] }).success).toBe(false)
+  })
+})
+
+describe('enlaces del catálogo', () => {
+  it('solo acepta http(s) o vacío', () => {
+    for (const ok of ['https://www.esteba.com/es/bisagra', 'http://proveedor.es', '']) expect(urlSchema.safeParse(ok).success).toBe(true)
+    for (const bad of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html,<b>x</b>', 'ftp://x.es', 'no es un enlace']) {
+      expect(urlSchema.safeParse(bad).success).toBe(false)
+    }
+  })
+
+  it('safeHref descarta lo que no sea http(s) aunque ya esté guardado', () => {
+    expect(safeHref('https://esteba.com/x')).toBe('https://esteba.com/x')
+    expect(safeHref('javascript:alert(1)')).toBeUndefined()
+    expect(safeHref(' javascript:alert(1)')).toBeUndefined()
+    expect(safeHref('data:text/html,x')).toBeUndefined()
+    expect(safeHref('')).toBeUndefined()
+    expect(safeHref('basura')).toBeUndefined()
   })
 })

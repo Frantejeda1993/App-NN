@@ -18,9 +18,30 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+// Email al que le quitaron el acceso con la sesión abierta. Se guarda en la
+// pestaña porque borrar los datos del dispositivo recarga la app.
+const REVOKED_KEY = 'nn:revoked'
+const storage = {
+  get: () => {
+    try {
+      return sessionStorage.getItem(REVOKED_KEY)
+    } catch {
+      return null
+    }
+  },
+  set: (email: string | null) => {
+    try {
+      if (email) sessionStorage.setItem(REVOKED_KEY, email)
+      else sessionStorage.removeItem(REVOKED_KEY)
+    } catch {
+      // Sin almacenamiento (modo privado estricto): solo se pierde el aviso.
+    }
+  },
+}
+
 export function AuthProvider({ service, children }: { service: AuthService; children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading', user: null, rejectedEmail: null })
-  const rejectedRef = useRef<string | null>(null)
+  const rejectedRef = useRef<string | null>(storage.get())
   const runRef = useRef(0)
   const lastUserRef = useRef<AuthUser | null>(null)
 
@@ -65,11 +86,32 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
 
   useEffect(() => service.onUserChanged((u) => void evaluate(u)), [service, evaluate])
 
+  // Con la sesión abierta, si desactivan al socio: fuera y sin datos en el dispositivo.
+  const memberEmail = state.status === 'member' ? state.user?.email : null
+  useEffect(() => {
+    if (!memberEmail) return
+    let done = false
+    const stop = service.watchMembership(memberEmail, (active) => {
+      if (active || done) return
+      done = true
+      runRef.current++ // invalida cualquier evaluación en curso
+      rejectedRef.current = memberEmail
+      storage.set(memberEmail)
+      setState({ status: 'notMember', user: null, rejectedEmail: memberEmail })
+      void service.signOut({ clearLocalData: true }).catch(() => {})
+    })
+    return () => {
+      done = true
+      stop()
+    }
+  }, [memberEmail, service])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
       async signIn() {
         rejectedRef.current = null
+        storage.set(null)
         // Si quedó una sesión de Firebase abierta (p. ej. tras un error al verificar
         // la membresía), se cierra primero: un nuevo login con el mismo usuario no
         // vuelve a disparar onUserChanged.
@@ -78,6 +120,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       },
       async signOut() {
         rejectedRef.current = null
+        storage.set(null)
         // Cierre de sesión pedido por el socio: borra también los datos en caché del
         // dispositivo (puede ser compartido).
         await service.signOut({ clearLocalData: true })

@@ -5,7 +5,7 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
 } from 'firebase/auth'
-import { clearIndexedDbPersistence, doc, getDoc, terminate } from 'firebase/firestore'
+import { clearIndexedDbPersistence, doc, getDoc, onSnapshot, terminate } from 'firebase/firestore'
 import { getFirebase, useEmulators } from '@/lib/firebase'
 import { isActiveMember, memberKey } from './membership'
 import type { AuthService, MemberDoc } from './types'
@@ -45,6 +45,18 @@ export function createFirebaseAuthService(): AuthService {
           window.location.reload()
         }
       }
+    },
+    watchMembership(email, cb) {
+      return onSnapshot(
+        doc(db, 'members', memberKey(email)),
+        (snap) => {
+          // Lo que viene de la caché local no prueba nada: solo decide el servidor.
+          if (snap.metadata.fromCache) return
+          cb(isActiveMember(snap.exists() ? (snap.data() as MemberDoc) : undefined))
+        },
+        // Sin conexión o error transitorio: no se cierra la sesión por eso.
+        () => {},
+      )
     },
     async isMember(email) {
       // Sin conexión, getDoc responde desde la caché local si ya se leyó antes.
