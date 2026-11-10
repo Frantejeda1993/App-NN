@@ -20,6 +20,7 @@ npm run dev
 | `npm test` | Tests unitarios y de componentes (Vitest) |
 | `npm run coverage` | Tests con cobertura |
 | `npm run test:rules` | Tests de `firestore.rules` contra el emulador (requiere Java 21+) |
+| `npm run test:e2e` | Pruebas de punta a punta con Playwright contra los emuladores (requiere Java 21+; la primera vez, `npx playwright install chromium`) |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
 | `npm run build` | Build de producción en `dist/` |
 

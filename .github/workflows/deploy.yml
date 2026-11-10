@@ -35,8 +35,39 @@ jobs:
       - run: npm test
       - run: npm run test:rules
 
+  e2e:
+    # Pruebas de punta a punta: navegador real contra los emuladores (mismas reglas).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          CI: true
+      - name: Guardar reporte y trazas si algo falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 14
+
   build:
-    needs: check
+    needs: [check, e2e]
     # Solo se publica desde main (ni PRs ni ejecuciones manuales de otras ramas).
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest

@@ -39,3 +39,8 @@ coverage
 
 # Local Claude preview config
 .claude/
+
+# Playwright (e2e)
+test-results/
+playwright-report/
+blob-report/

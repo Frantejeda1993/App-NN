@@ -42,6 +42,9 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
+  // jsPDF se importa recién al pulsar "Descargar PDF": se pre-empaqueta al arrancar
+  // para que el servidor de desarrollo no recargue la página en ese momento.
+  optimizeDeps: { include: ['jspdf', 'jspdf-autotable'] },
   build: {
     rollupOptions: {
       output: {
