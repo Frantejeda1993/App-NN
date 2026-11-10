@@ -2,6 +2,7 @@ import { ArrowLeft, Copy, CopyPlus, FileDown, Pencil, Plus, Save, Trash2 } from 
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Dialog } from '@/components/ui/dialog'
 import { Badge, Card, Field, Input, Select, Textarea } from '@/components/ui/form'
 import { MoneyInput } from '@/components/ui/money-input'
 import { useData, useMyEmail } from '@/data/DataProvider'
@@ -369,7 +370,8 @@ function Editor({
         </p>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* minmax(0,1fr) también en celular: si no, la columna crece con el texto más largo de los selectores. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <div className="grid gap-3 md:grid-cols-2">
@@ -428,7 +430,7 @@ function Editor({
           <Card>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">Muebles</h2>
-              {editable && !itemEdit && (
+              {editable && (
                 <div className="flex flex-wrap gap-2">
                   {activeTemplates.length > 0 && (
                     <Select
@@ -456,7 +458,7 @@ function Editor({
               )}
             </div>
 
-            {draft.items.length === 0 && !itemEdit && <p className="text-sm text-muted-foreground">Todavía no hay muebles.</p>}
+            {draft.items.length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay muebles.</p>}
             <ul aria-label="Muebles del presupuesto" className="flex flex-col divide-y divide-border">
               {draft.items.map((it, i) => {
                 const b = totals.items[i]
@@ -500,7 +502,7 @@ function Editor({
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="mr-2 text-sm font-medium tabular-nums">{formatEuros(b?.totalCents ?? 0)}</span>
-                        {editable && !itemEdit && (
+                        {editable && (
                           <>
                             <Button size="icon" variant="ghost" aria-label={`Editar ${it.name}`} onClick={() => startItem(it, i)}>
                               <Pencil />
@@ -551,10 +553,38 @@ function Editor({
               })}
             </ul>
 
-            {itemEdit && (
-              <div className="mt-3 rounded-xl border border-primary/40 p-3 md:p-4">
-                <h3 className="mb-3 font-semibold">{itemEdit.index === null ? 'Nuevo mueble' : 'Editar mueble'}</h3>
+            <Dialog
+              open={itemEdit !== null}
+              onClose={() => setItemEdit(null)}
+              title={itemEdit?.index === null ? 'Nuevo mueble' : `Editar mueble${itemEdit?.item.name ? `: ${itemEdit.item.name}` : ''}`}
+              footer={
+                itemEdit && (
+                  <div className="flex flex-col gap-2">
+                    {Object.keys(itemEdit.errors).length > 0 && (
+                      <p role="alert" className="text-sm text-destructive">
+                        Revisá los datos del mueble: {Object.values(itemEdit.errors).join(' · ')}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm">
+                        Precio del mueble: <strong className="tabular-nums">{formatEuros(preview?.totalCents ?? 0)}</strong>
+                      </p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setItemEdit(null)}>
+                          Cancelar
+                        </Button>
+                        <Button type="submit" form="qi-form">
+                          {itemEdit.index === null ? 'Agregar mueble' : 'Guardar mueble'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+            >
+              {itemEdit && (
                 <form
+                  id="qi-form"
                   noValidate
                   className="flex flex-col gap-4"
                   onSubmit={(e) => {
@@ -564,12 +594,7 @@ function Editor({
                 >
                   <FurnitureItemEditor
                     value={itemEdit.item}
-                    onChange={(v: FurnitureDraft) =>
-                      setItemEdit({
-                        ...itemEdit,
-                        item: { ...itemEdit.item, ...v },
-                      })
-                    }
+                    onChange={(v: FurnitureDraft) => setItemEdit({ ...itemEdit, item: { ...itemEdit.item, ...v } })}
                     catalog={refs}
                     errors={itemEdit.errors}
                     idPrefix="qi"
@@ -581,12 +606,7 @@ function Editor({
                         nullable
                         placeholder="Calculado"
                         cents={itemEdit.item.finalPriceCents}
-                        onChange={(c) =>
-                          setItemEdit({
-                            ...itemEdit,
-                            item: { ...itemEdit.item, finalPriceCents: c },
-                          })
-                        }
+                        onChange={(c) => setItemEdit({ ...itemEdit, item: { ...itemEdit.item, finalPriceCents: c } })}
                       />
                     </Field>
                     {preview && (
@@ -595,20 +615,9 @@ function Editor({
                       </div>
                     )}
                   </div>
-                  {Object.keys(itemEdit.errors).length > 0 && (
-                    <p role="alert" className="text-sm text-destructive">
-                      Revisá los datos del mueble: {Object.values(itemEdit.errors).join(' · ')}
-                    </p>
-                  )}
-                  <div className="flex gap-2">
-                    <Button type="submit">{itemEdit.index === null ? 'Agregar mueble' : 'Guardar mueble'}</Button>
-                    <Button variant="outline" onClick={() => setItemEdit(null)}>
-                      Cancelar
-                    </Button>
-                  </div>
                 </form>
-              </div>
-            )}
+              )}
+            </Dialog>
           </Card>
 
           {(editable || draft.freeLines.length > 0) && (

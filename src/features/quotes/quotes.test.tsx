@@ -203,4 +203,39 @@ describe('presupuestos', () => {
     expect(await screen.findByRole('heading', { name: /cocina/i })).toBeInTheDocument()
     expect(screen.queryByText(/lista de compras/i)).not.toBeInTheDocument()
   })
+
+  it('el mueble se carga en una ventana que se cierra al agregar, cancelar o con Escape', async () => {
+    const { api } = setup()
+    const q = api.seedQuote({ title: 'Placard' })
+    renderApp(`/presupuestos/${q.id}`, api)
+
+    // Cancelar: se cierra sin agregar y el foco vuelve al botón.
+    const blank = await screen.findByRole('button', { name: /mueble en blanco/i })
+    await userEvent.click(blank)
+    const dialog = screen.getByRole('dialog', { name: /nuevo mueble/i })
+    expect(within(dialog).getByLabelText(/nombre del mueble/i)).toHaveFocus()
+    await userEvent.click(within(dialog).getByRole('button', { name: /cancelar/i }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(blank).toHaveFocus()
+
+    // Escape también cancela.
+    await userEvent.click(blank)
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cambios sin guardar')).not.toBeInTheDocument()
+
+    // Con un error de validación la ventana sigue abierta; al agregar, se cierra.
+    await userEvent.click(blank)
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /agregar mueble/i }))
+    expect(screen.getByRole('dialog')).toHaveTextContent(/revisá los datos del mueble/i)
+    await userEvent.type(screen.getByLabelText(/nombre del mueble/i), 'Caja')
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /agregar mueble/i }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('list', { name: /muebles del presupuesto/i })).getByText('Caja')).toBeInTheDocument()
+
+    // Editar abre la misma ventana con los datos del mueble.
+    await userEvent.click(screen.getByRole('button', { name: /editar caja/i }))
+    expect(screen.getByRole('dialog', { name: /editar mueble: caja/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/nombre del mueble/i)).toHaveValue('Caja')
+  })
 })
