@@ -51,6 +51,8 @@ export async function resetData() {
   const audit = { createdBy: DEV, updatedBy: DEV, createdAt: new Date(), updatedAt: new Date() }
   await put(`members/${DEV}`, { name: 'Dev', active: true })
   await put(`members/${NAHUEL}`, { name: 'Nahuel', active: true })
+  // El tour ya visto: no tapa las demás pruebas (tour.spec.ts lo borra para probarlo).
+  await put(`userPrefs/${DEV}`, { tourSeenVersion: 1000, updatedAt: new Date() })
   await put('boxes/banco', { name: 'Banco', active: true, ...audit })
   await put('boxes/efectivo', { name: 'Efectivo', active: true, ...audit })
 }
@@ -101,4 +103,9 @@ export async function seedProject(id = 'p1', title = 'Cocina Ana') {
 /** Activa o desactiva un socio desde "la consola" (token owner del emulador). */
 export async function setMemberActive(email: string, active: boolean) {
   await put(`members/${email}`, { name: email.split('@')[0], active })
+}
+
+/** Borra un documento (token owner). */
+export async function deleteDoc(path: string) {
+  await fetch(`${FIRESTORE}/${path}`, { method: 'DELETE', headers })
 }

@@ -4,6 +4,8 @@ import {
   doc,
   onSnapshot,
   query,
+  serverTimestamp,
+  setDoc,
   where,
   type DocumentSnapshot,
   type Firestore,
@@ -30,6 +32,7 @@ import {
   WorkshopSettingsSchema,
   type AuditFields,
   type Stored,
+  UserPrefsSchema,
 } from '@/model'
 import { byCreatedDesc, byDateDesc, byMovementDesc, byName, type DataApi } from './api'
 import { addContact, createDocument, createMovement, deleteMovement, updateDocument, updateMovement } from './repo'
@@ -325,6 +328,25 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
       return exists
         ? updateDocument(db, COLLECTIONS.settings, SETTINGS_DOCS.services, ServiceRatesSchema, next, by)
         : createDocument(db, COLLECTIONS.settings, ServiceRatesSchema, next, by, SETTINGS_DOCS.services)
+    },
+
+    watchMyPrefs(email, cb) {
+      return onSnapshot(
+        doc(db, COLLECTIONS.userPrefs, email.trim().toLowerCase()),
+        (snap) => {
+          const parsed = UserPrefsSchema.safeParse(snap.data() ?? {})
+          cb(snap.exists() && parsed.success ? parsed.data : null)
+        },
+        // Sin permiso o sin conexión no es grave: solo no se sabe si vio el tour.
+        () => {},
+      )
+    },
+
+    saveMyPrefs(email, prefs) {
+      const id = email.trim().toLowerCase()
+      const committed = setDoc(doc(db, COLLECTIONS.userPrefs, id), { ...UserPrefsSchema.parse(prefs), updatedAt: serverTimestamp() })
+      committed.catch(() => {})
+      return { id, committed }
     },
 
     saveWorkshopSettings(next, exists, by) {

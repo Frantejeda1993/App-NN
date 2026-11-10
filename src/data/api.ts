@@ -26,6 +26,7 @@ import type {
   QuoteDataSchema,
   Stored,
   WorkshopSettings,
+  UserPrefs,
 } from '@/model'
 import type { WriteResult } from './repo'
 
@@ -124,6 +125,10 @@ export interface DataApi {
     by: string,
   ): WriteResult
   saveWorkshopSettings(next: WorkshopSettings, exists: boolean, by: string): WriteResult
+
+  /** Preferencias del usuario (`null` = todavía no tiene). Solo las propias. */
+  watchMyPrefs(email: string, cb: (prefs: UserPrefs | null) => void): Unsubscribe
+  saveMyPrefs(email: string, prefs: UserPrefs): WriteResult
 
   // ---- catálogo (no se borra: se desactiva) ----
   watchMaterials(cb: (items: Material[]) => void): Unsubscribe

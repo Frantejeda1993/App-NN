@@ -17,6 +17,13 @@ export const MemberDataSchema = z.object({
 })
 export type MemberData = z.infer<typeof MemberDataSchema>
 
+// ---- userPrefs/{email}: preferencias de cada usuario (solo las ve y cambia él) ----
+export const UserPrefsSchema = z.object({
+  /** Versión del tour de la app que ya vio (0 = nunca). */
+  tourSeenVersion: z.number().int().min(0).max(1000).default(0),
+})
+export type UserPrefs = z.infer<typeof UserPrefsSchema>
+
 // ---- settings/workshop -------------------------------------------------------
 export const WorkshopSettingsSchema = z.object({
   name: nameSchema.default('Taller NN'),

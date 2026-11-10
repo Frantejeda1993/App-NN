@@ -15,6 +15,7 @@ import type {
   SettingsState,
   Template,
 } from './api'
+import type { UserPrefs } from '@/model'
 import { useData, useLive } from './DataProvider'
 
 /** Hooks tipados de lectura en tiempo real. `undefined` = cargando. */
@@ -113,4 +114,10 @@ export function useMovementHistory(id: string): AuditEntry[] | undefined {
 export function useWorkshopSettings(): SettingsState | undefined {
   const api = useData()
   return useLive<SettingsState>((cb) => api.watchWorkshopSettings(cb), [])
+}
+
+/** Preferencias propias; `undefined` = cargando, `null` = todavía no tiene. */
+export function useMyPrefs(email: string): UserPrefs | null | undefined {
+  const api = useData()
+  return useLive<UserPrefs | null>((cb) => (email ? api.watchMyPrefs(email, cb) : none(cb)), [email])
 }

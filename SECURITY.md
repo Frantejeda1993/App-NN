@@ -21,6 +21,7 @@ mensajes, pero nunca se confía solo en eso.
 |---|---|---|
 | Alguien fuera de la lista, socio desactivado, email sin verificar o sin sesión | Las reglas niegan leer, listar y crear en **todas** las colecciones | `tests/rules` (matriz por colección) |
 | Socio desactivado con la sesión abierta | La app vigila su registro en vivo: cierra sesión y borra los datos del dispositivo | `AuthProvider.test.tsx`, e2e `access.spec.ts` |
+| Preferencias de otro usuario (`userPrefs`, p. ej. el tour visto) | Cada socio lee y escribe solo las suyas, con campos fijos | `tests/rules` (preferencias de usuario) |
 | Dispositivo compartido | "Cerrar sesión" borra la caché offline de Firestore | `AuthProvider` |
 | Login falso de desarrollo en producción | Solo existe con `import.meta.env.DEV` y emuladores | `src/lib/firebase.ts` |
 | Enlaces maliciosos en el catálogo (`javascript:`, `data:`) | Solo se guardan `http(s)` y al mostrar se vuelve a filtrar (`safeHref`) | `schemas.test.ts` |

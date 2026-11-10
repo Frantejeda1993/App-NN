@@ -139,6 +139,28 @@ describe('matriz de acceso por colección', () => {
   }
 })
 
+describe('preferencias de usuario (tour)', () => {
+  const prefs = (v: unknown) => ({ tourSeenVersion: v, updatedAt: serverTimestamp() })
+
+  it('cada socio lee y guarda solo las suyas', async () => {
+    await assertSucceeds(setDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`), prefs(1)))
+    await assertSucceeds(getDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`)))
+    await assertSucceeds(setDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`), prefs(2)))
+    // Las de otro socio, no.
+    await assertFails(getDoc(doc(dbAs(NAHUEL), `userPrefs/${NACHO}`)))
+    await assertFails(setDoc(doc(dbAs(NAHUEL), `userPrefs/${NACHO}`), prefs(0)))
+    await assertFails(getDocs(collection(dbAs(NACHO), 'userPrefs')))
+  })
+
+  it('un no socio no guarda nada y no se aceptan campos extra ni valores raros', async () => {
+    await assertFails(setDoc(doc(dbAs('extrano@gmail.com'), 'userPrefs/extrano@gmail.com'), prefs(1)))
+    await assertFails(setDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`), { ...prefs(1), admin: true }))
+    await assertFails(setDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`), prefs('1')))
+    await assertFails(setDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`), prefs(-1)))
+    await assertFails(setDoc(doc(dbAs(NACHO), `userPrefs/${NACHO}`), { tourSeenVersion: 1, updatedAt: Timestamp.fromMillis(0) }))
+  })
+})
+
 describe('acceso general', () => {
   it('un no socio no puede leer ni crear datos de negocio', async () => {
     const db = dbAs('extrano@gmail.com')

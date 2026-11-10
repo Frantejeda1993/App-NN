@@ -27,6 +27,8 @@ import {
   type ContactData,
   type ProjectData,
   type WorkshopSettings,
+  UserPrefsSchema,
+  type UserPrefs,
 } from '@/model'
 import {
   byCreatedDesc,
@@ -380,6 +382,19 @@ export class FakeDataApi implements DataApi {
     this.serviceRates = ServiceRatesSchema.parse(next)
     this.serviceRatesExist = true
     return this.done('services')
+  }
+
+  /** Por defecto el tour ya está visto, para no tapar las otras pruebas. */
+  prefs = new Map<string, UserPrefs>()
+  prefsDefault: UserPrefs | null = { tourSeenVersion: 1000 }
+
+  watchMyPrefs(email: string, cb: (p: UserPrefs | null) => void) {
+    return this.watch(() => cb(this.prefs.get(email) ?? this.prefsDefault))
+  }
+
+  saveMyPrefs(email: string, prefs: UserPrefs) {
+    this.prefs.set(email, UserPrefsSchema.parse(prefs))
+    return this.done(email)
   }
 
   saveWorkshopSettings(next: WorkshopSettings) {

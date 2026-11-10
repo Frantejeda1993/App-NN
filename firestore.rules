@@ -291,6 +291,18 @@ service cloud.firestore {
       allow delete: if isMember() && resource.data.status == 'borrador';
     }
 
+    // ---- Preferencias de cada usuario (p. ej. si ya vio el tour) ------------
+    // Solo las propias: nadie lee ni cambia las de otro socio.
+    match /userPrefs/{email} {
+      allow read: if isMember() && email == emailKey();
+      allow create, update: if isMember() && email == emailKey()
+        && request.resource.data.keys().hasOnly(['tourSeenVersion', 'updatedAt'])
+        && request.resource.data.tourSeenVersion is int
+        && request.resource.data.tourSeenVersion >= 0 && request.resource.data.tourSeenVersion <= 1000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     // Cualquier otra ruta queda cerrada.
   }
 }

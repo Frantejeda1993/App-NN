@@ -47,7 +47,7 @@ export function QuotesListPage() {
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Presupuestos</h1>
-        <Button onClick={create} disabled={!settings}>
+        <Button onClick={create} disabled={!settings} data-tour="nuevo-presupuesto">
           <Plus /> Nuevo presupuesto
         </Button>
       </div>

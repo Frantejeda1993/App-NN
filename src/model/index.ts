@@ -21,6 +21,7 @@ export const COLLECTIONS = {
   templates: 'templates',
   quotes: 'quotes',
   auditLog: 'auditLog',
+  userPrefs: 'userPrefs',
 } as const
 
 /** Documentos de settings/. */
