@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge, Card } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
-import { useContacts, useMembers } from '@/data/hooks'
+import { useAllMembers, useContacts } from '@/data/hooks'
 import { byDateDesc, type Client } from '@/data/api'
 import { whatsappLink } from '@/domain/clients'
 import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
@@ -21,7 +21,8 @@ export function ProjectContacts({ client, projectId }: { client: Client; project
   const api = useData()
   const me = useMyEmail()
   const contacts = useContacts(client.id)
-  const members = useMembers()
+  // Solo para el nombre de quién cargó cada contacto: incluye al administrador.
+  const members = useAllMembers()
   const [showAll, setShowAll] = useState(false)
   const today = todayIso()
   const wa = whatsappLink(client.phone)

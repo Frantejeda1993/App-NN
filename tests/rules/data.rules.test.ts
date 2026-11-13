@@ -142,6 +142,33 @@ describe('matriz de acceso por colección', () => {
   }
 })
 
+// El administrador entra a la web (lee y trabaja como un socio) pero no es socio:
+// la exclusión de los repartos y saldos se prueba en los movimientos y en la app.
+describe('administrador (no es socio)', () => {
+  const ADMIN = 'admin@gmail.com'
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `members/${ADMIN}`), { name: 'Admin', active: true, role: 'admin' })
+      await setDoc(doc(ctx.firestore(), 'clients/c1'), { name: 'x', ...stamp(NACHO) })
+    })
+  })
+
+  it('lee las colecciones y la lista de members', async () => {
+    await assertSucceeds(getDoc(doc(dbAs(ADMIN), 'clients/c1')))
+    await assertSucceeds(getDocs(collection(dbAs(ADMIN), 'members')))
+  })
+
+  it('crea clientes con su auditoría', async () => {
+    const { committed } = createDocument(dbAs(ADMIN), 'clients', ClientDataSchema, { name: 'Cliente del admin' }, ADMIN)
+    await assertSucceeds(committed)
+  })
+
+  it('no puede cambiar su propio rol ni volverse socio', async () => {
+    await assertFails(updateDoc(doc(dbAs(ADMIN), `members/${ADMIN}`), { role: 'socio' }))
+  })
+})
+
 describe('preferencias de usuario (tour)', () => {
   const prefs = (v: unknown) => ({ tourSeenVersion: v, updatedAt: serverTimestamp() })
 
@@ -625,6 +652,25 @@ describe('movimientos: reglas cruzadas (revisión de seguridad)', () => {
       await setDoc(doc(ctx.firestore(), 'members/baja@gmail.com'), { name: 'Baja', active: false })
     })
     await assertFails(rawMovement(dbAs(NACHO), 'x10', { type: 'retiro', projectId: null, memberEmail: 'baja@gmail.com' }))
+  })
+
+  it('no se asigna un pago, retiro o reparto a un administrador (no es socio)', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'members/admin@gmail.com'), { name: 'Admin', active: true, role: 'admin' })
+    })
+    const admin = 'admin@gmail.com'
+    await assertFails(rawMovement(dbAs(NACHO), 'a1', { type: 'retiro', projectId: null, memberEmail: admin }))
+    await assertFails(rawMovement(dbAs(NACHO), 'a2', { type: 'reparto', projectId: null, memberEmail: admin, boxId: null }))
+    await assertFails(
+      rawMovement(dbAs(NACHO), 'a3', { type: 'gasto_proyecto', status: 'pagado', boxId: null, paidBy: admin }),
+    )
+  })
+
+  it('un socio con role "socio" explícito sigue pudiendo recibir retiros', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'members/otro@gmail.com'), { name: 'Otro', active: true, role: 'socio' })
+    })
+    await assertSucceeds(rawMovement(dbAs(NACHO), 'a4', { type: 'retiro', projectId: null, memberEmail: 'otro@gmail.com' }))
   })
 
   it('una baja lógica sin motivo se rechaza', async () => {

@@ -27,4 +27,6 @@ export type AuthStatus = 'loading' | 'signedOut' | 'notMember' | 'member' | 'err
 export interface MemberDoc {
   name?: string
   active?: boolean
+  /** `admin`: entra a la app pero no es socio. Sin valor = socio. */
+  role?: 'socio' | 'admin'
 }

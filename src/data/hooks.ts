@@ -16,6 +16,7 @@ import type {
   SettingsState,
   Template,
 } from './api'
+import { useMemo } from 'react'
 import type { UserPrefs } from '@/model'
 import { useData, useLive } from './DataProvider'
 
@@ -42,9 +43,19 @@ export function useContacts(clientId: string): Contact[] | undefined {
   return useLive<Contact[]>((cb) => api.watchContacts(clientId, cb), [clientId])
 }
 
-export function useMembers(): Member[] | undefined {
+/**
+ * Todos los usuarios con acceso, administradores incluidos. Solo para mostrar
+ * nombres (quién cargó algo); para repartos, saldos y selectores usá `useMembers`.
+ */
+export function useAllMembers(): Member[] | undefined {
   const api = useData()
   return useLive<Member[]>((cb) => api.watchMembers(cb), [])
+}
+
+/** Solo los socios: el administrador no participa de repartos ni de cálculos. */
+export function useMembers(): Member[] | undefined {
+  const all = useAllMembers()
+  return useMemo(() => all?.filter((m) => m.role !== 'admin'), [all])
 }
 
 export function useProjects(): Project[] | undefined {

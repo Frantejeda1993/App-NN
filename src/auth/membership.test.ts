@@ -23,4 +23,9 @@ describe('isActiveMember', () => {
   it('acepta un socio activo', () => {
     expect(isActiveMember({ name: 'Nacho', active: true })).toBe(true)
   })
+
+  it('un administrador activo también entra (su rol solo lo deja fuera de los cálculos)', () => {
+    expect(isActiveMember({ name: 'Ana', active: true, role: 'admin' })).toBe(true)
+    expect(isActiveMember({ name: 'Ana', active: false, role: 'admin' })).toBe(false)
+  })
 })

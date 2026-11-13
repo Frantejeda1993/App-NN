@@ -1,74 +1,76 @@
-# Graph Report - App NN  (2026-11-13)
+# Graph Report - App NN  (2026-11-14)
 
 ## Corpus Check
-- 166 files · ~86,946 words
+- 167 files · ~87,756 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 7 file(s) not represented in the graph (top: (none) 3, .example 1, .rules 1)
 
 ## Summary
-- 1294 nodes · 4311 edges · 56 communities (52 shown, 4 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 93 edges (avg confidence: 0.86)
+- 1267 nodes · 4324 edges · 53 communities (49 shown, 4 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 95 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
+## Graph Freshness
+- Built from commit: `69641931`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
+
 ## Community Hubs (Navigation)
-- QuoteEditorPage.tsx
+- QuoteParts.tsx
 - hooks.ts
 - generalExpenses.ts
 - dashboard.ts
-- AppShell.tsx
-- quotePdf.ts
+- AuthProvider.tsx
+- pdf.ts
 - devDependencies
-- Tests e2e (Playwright)
-- Tests de pantallas
-- Escrituras de DataApi
+- support.ts
+- vitest
+- DataApi
 - FakeDataApi
-- Esquemas zod y auditoría
-- Capa Firestore
-- projects.ts
-- Dependencias de producción
-- TS config de la app
+- index.ts
+- firestoreApi.ts
+- GeneralExpenseFormPage.tsx
+- dependencies
+- compilerOptions
 - Firestore data model (members, settings/workshop, clients, contacts, projects, boxes, movements, generalExpenses, catalog/*, templates, quotes, auditLog)
-- Geometría 3D de muebles
+- furniture3d.ts
 - api.ts
-- TS config de Node
-- main.tsx
-- AuthService
-- shopping.ts
+- compilerOptions
+- Button
+- Plan: carpentry workshop management app
+- ShoppingListCard.tsx
 - Seguridad de Taller NN
-- Datos de prueba del emulador
+- seed-emulator.mjs
 - domain/catalog.ts
-- shared.ts
-- Disparadores del deploy
+- QuoteEditorPage.tsx
+- deploy.yml
 - quote.ts
-- Build con Vite y PWA
-- Scripts npm
+- vite.config.ts
+- scripts
 - eslint.config.js
 - package.json
-- downloadQuotePdf
-- Jobs del CI
-- Job de publicación en Pages
-- dates.ts
-- Pasos del CI
-- Variables de Firebase en CI
-- Parámetros de acciones del CI
-- Dependabot
+- setup
+- jobs
+- deploy
+- todayIso
+- steps
+- env
+- with
+- updates
 - .seedClient
-- Logo e íconos
+- App-NN Brand Mark (geometric N, black slate + walnut wood on cream)
 - MovementForm.tsx
 - firestore.rules as the only real security barrier
-- TS config raíz
-- Desarrollo con emuladores
+- tsconfig.json
+- Emulator-based local development (dev:emulators, dev@taller.test)
 - Taller NN - guia para Claude
 - Implementation steps 1-14
-- clients.ts
+- src/domain: logica pura testeada
 - Step 1: project base, Google login, layout, deploy
 - Tabla de protecciones (riesgo / proteccion / prueba)
-- money.test.ts
-- catalog/labels.ts
-- AuthContextValue
 
 ## God Nodes (most connected - your core abstractions)
-1. `FakeDataApi` - 99 edges
+1. `FakeDataApi` - 102 edges
 2. `Button()` - 65 edges
 3. `useData()` - 62 edges
 4. `formatEuros()` - 60 edges
@@ -82,12 +84,12 @@
 ## Surprising Connections (you probably didn't know these)
 - `src/data: DataApi, firestoreApi, repo, hooks` --references--> `DataApi`  [AMBIGUOUS]
   CLAUDE.md → src/data/api.ts
-- `FakeDataApi debe comportarse como las reglas` --references--> `FakeDataApi`  [EXTRACTED]
-  CLAUDE.md → src/test/fakeApi.ts
 - `Ediciones simultaneas con contador rev` --references--> `updateWithRev()`  [INFERRED]
   SECURITY.md → src/data/repo.ts
 - `Dinero en centimos enteros y porcentajes en puntos basicos` --references--> `allocateByWeights()`  [EXTRACTED]
   CLAUDE.md → src/domain/percent.ts
+- `FakeDataApi debe comportarse como las reglas` --references--> `FakeDataApi`  [EXTRACTED]
+  CLAUDE.md → src/test/fakeApi.ts
 - `Apple Touch Icon 180x180 (iOS home-screen icon, split black/walnut N mark)` --semantically_similar_to--> `In-App Logo (faceted N: black slate and walnut wood pieces)`  [INFERRED] [semantically similar]
   public/apple-touch-icon-180x180.png → src/assets/logo.png
 
@@ -102,125 +104,129 @@
 - **Endurecimiento del cliente estatico en GitHub Pages** — security_frame_guard, security_csp_plugin, security_safe_href, security_dev_login_guard, security_url_param_validation [INFERRED 0.75]
 - **Integridad del dinero: centimos, movimientos versionados, auditLog y reglas** — claude_money_in_cents, claude_versioned_movements, security_strict_money_movements, security_firestore_rules_barrier, src_domain_percent_allocatebyweights [INFERRED 0.85]
 
-## Communities (56 total, 4 thin omitted)
+## Communities (53 total, 4 thin omitted)
 
-### Community 0 - "QuoteEditorPage.tsx"
-Cohesion: 0.13
-Nodes (23): Dialog(), ItemBreakdown, QuoteTotals, itemFromTemplate(), newLocalId(), ItemEdit, withEditedItem(), ACTION_LABELS (+15 more)
+### Community 0 - "QuoteParts.tsx"
+Cohesion: 0.27
+Nodes (9): ItemBreakdown, ItemEdit, plural(), QuoteItemRow(), QuoteItemRowProps, Adjustment, Breakdown(), FreeLine (+1 more)
 
 ### Community 1 - "hooks.ts"
-Cohesion: 0.05
-Nodes (164): @hookform/resolvers, lucide-react, react, react-hook-form, react-router-dom, AppRoutes(), Button(), ButtonProps (+156 more)
+Cohesion: 0.06
+Nodes (152): @hookform/resolvers, lucide-react, react-hook-form, react-router-dom, AppRoutes(), buttonVariants, Badge(), Card() (+144 more)
 
 ### Community 2 - "generalExpenses.ts"
-Cohesion: 0.23
-Nodes (8): dueFixedExpenses(), FixedExpenseLike, fixedExpenseStatus(), FixedStatus, monthKey(), MovementLike, alquiler, FIXED_STATUS_LABELS
+Cohesion: 0.27
+Nodes (7): dueFixedExpenses(), FixedExpenseLike, fixedExpenseStatus(), FixedStatus, monthKey(), MovementLike, alquiler
 
 ### Community 3 - "dashboard.ts"
-Cohesion: 0.08
-Nodes (47): settings/opening (saldos iniciales), Panel de la billetera, ACCEPTED, acceptedAmount(), Allocation, allocations(), collectedByProject(), CollectionRow (+39 more)
+Cohesion: 0.10
+Nodes (38): Panel de la billetera, ACCEPTED, acceptedAmount(), Allocation, allocations(), collectedByProject(), CollectionRow, DashboardInput (+30 more)
 
-### Community 4 - "AppShell.tsx"
-Cohesion: 0.12
-Nodes (19): react-dom@^19.2.0, react-dom, useAuth(), AppShell(), UserBadge(), Brand(), Logo(), NAV_ITEMS (+11 more)
+### Community 4 - "AuthProvider.tsx"
+Cohesion: 0.05
+Nodes (36): AuthContext, AuthContextValue, AuthState, storage, extrano, nacho, Probe(), useAuth() (+28 more)
 
-### Community 5 - "quotePdf.ts"
-Cohesion: 0.12
-Nodes (15): eur(), pdfFileName(), PdfRow, PdfTotal, plural(), QuotePdfModel, quotePdfModel(), catalog (+7 more)
+### Community 5 - "pdf.ts"
+Cohesion: 0.17
+Nodes (9): jspdf@4.2.1, jspdf-autotable@5.0.9, jspdf, jspdf-autotable, downloadQuotePdf(), INK, MUTED, toDataUrl() (+1 more)
 
 ### Community 6 - "devDependencies"
 Cohesion: 0.10
-Nodes (21): devDependencies, firebase-tools@^15.35.0, jsdom@^31.0.0, @playwright/test@1.64.1, tailwindcss@^4.3.5, @testing-library/jest-dom@^7.0.1, @testing-library/react@^16.3.3, @testing-library/user-event@^14.6.8 (+13 more)
+Nodes (21): devDependencies, @firebase/rules-unit-testing@^6.0.0, firebase-tools@^15.35.0, jsdom@^31.0.0, @playwright/test@1.64.1, tailwindcss@^4.3.5, @testing-library/jest-dom@^7.0.1, @testing-library/react@^16.3.3 (+13 more)
 
-### Community 7 - "Tests e2e (Playwright)"
+### Community 7 - "support.ts"
 Cohesion: 0.11
 Nodes (25): deleteDoc(), DEV, euros(), fields(), headers, Json, kpi(), listDocs() (+17 more)
 
-### Community 8 - "Tests de pantallas"
-Cohesion: 0.10
-Nodes (26): @testing-library/react, @testing-library/user-event, vitest, nacho, setup(), AuthContext, AuthProvider(), AuthState (+18 more)
+### Community 8 - "vitest"
+Cohesion: 0.13
+Nodes (17): @testing-library/react, @testing-library/user-event, vitest, nacho, setup(), AuthProvider(), DataProvider(), SHARES (+9 more)
 
-### Community 9 - "Escrituras de DataApi"
+### Community 9 - "DataApi"
 Cohesion: 0.05
-Nodes (14): DataApi, WriteResult, HardwareDataSchema, ClientData, ClientDataSchema, ContactDataSchema, ProjectDataSchema, UserPrefs (+6 more)
+Nodes (13): DataApi, WriteResult, EdgeBandingDataSchema, HardwareDataSchema, ClientData, ContactDataSchema, UserPrefs, QuoteDataSchema (+5 more)
 
 ### Community 10 - "FakeDataApi"
-Cohesion: 0.09
-Nodes (5): Movement, seedCatalog(), newUser(), ProjectData, FakeDataApi
-
-### Community 11 - "Esquemas zod y auditoría"
-Cohesion: 0.07
-Nodes (48): zod, AUDIT_ACTIONS, AuditLog, AuditLogSchema, ServiceRatesSchema, supplierFields, AuditFieldsSchema, bpSchema (+40 more)
-
-### Community 12 - "Capa Firestore"
 Cohesion: 0.10
-Nodes (32): firebase, createFirestoreDataApi(), onError(), StoredMovementSchema, toStored(), watchList(), addContact(), addMovementVersion() (+24 more)
+Nodes (4): Movement, seed(), newUser(), FakeDataApi
 
-### Community 13 - "projects.ts"
-Cohesion: 0.14
-Nodes (20): DISTRIBUTION_CATEGORY, equalShares(), scaleRound(), allocateByShares(), allocateByWeights(), bpToPercent(), formatPercent(), FULL_SHARE_BP (+12 more)
+### Community 11 - "index.ts"
+Cohesion: 0.07
+Nodes (48): zod, WORKSHOP_SHARE_KEY, HARDWARE_KIND_LABELS, HARDWARE_UNIT_LABELS, AUDIT_ACTIONS, AuditLog, AuditLogSchema, HARDWARE_KINDS (+40 more)
 
-### Community 14 - "Dependencias de producción"
+### Community 12 - "firestoreApi.ts"
+Cohesion: 0.13
+Nodes (33): firebase, createFirestoreDataApi(), onError(), StoredMovementSchema, toStored(), watchList(), addContact(), addMovementVersion() (+25 more)
+
+### Community 13 - "GeneralExpenseFormPage.tsx"
 Cohesion: 0.08
-Nodes (24): dependencies, class-variance-authority@^0.7.1, clsx@^2.1.1, firebase@^13.2.0, @fontsource/calistoga@^5.3.0, @fontsource-variable/inter@^5.3.0, @hookform/resolvers@^7.0.3, lucide-react@^1.70.0 (+16 more)
+Nodes (43): Member, AlertableClient, lastTouch(), matchesSearch(), normalizeText(), whatsappLink(), centsToEuros(), eurFormatter (+35 more)
 
-### Community 15 - "TS config de la app"
+### Community 14 - "dependencies"
+Cohesion: 0.08
+Nodes (26): dependencies, class-variance-authority@^0.7.1, clsx@^2.1.1, firebase@^13.2.0, @fontsource/calistoga@^5.3.0, @fontsource-variable/inter@^5.3.0, @hookform/resolvers@^7.0.3, lucide-react@^1.70.0 (+18 more)
+
+### Community 15 - "compilerOptions"
 Cohesion: 0.08
 Nodes (23): compilerOptions, allowImportingTsExtensions, baseUrl, erasableSyntaxOnly, jsx, lib, module, moduleDetection (+15 more)
 
 ### Community 16 - "Firestore data model (members, settings/workshop, clients, contacts, projects, boxes, movements, generalExpenses, catalog/*, templates, quotes, auditLog)"
-Cohesion: 0.11
-Nodes (22): Catalog (materials, edgeBanding, hardware, services) with supplier and link, Contact alerts (nextContactAt overdue / N days) + WhatsApp button, Pure domain module src/domain/ (quote, balances, split calculations) with Vitest, Excel features incorporated (15 items: pending payments, waste factor, shopping list, shared purchases, multiplier...), Goal: replace Excel 'Calculo muebles presupuesto.xlsx' for 2-3 partners, Firestore data model (members, settings/workshop, clients, contacts, projects, boxes, movements, generalExpenses, catalog/*, templates, quotes, auditLog), Money as integer EUR cents, never floats, Money flow: sent/accepted quotes as future income, cobro into boxes (+14 more)
+Cohesion: 0.14
+Nodes (18): Catalog (materials, edgeBanding, hardware, services) with supplier and link, Contact alerts (nextContactAt overdue / N days) + WhatsApp button, Pure domain module src/domain/ (quote, balances, split calculations) with Vitest, Excel features incorporated (15 items: pending payments, waste factor, shopping list, shared purchases, multiplier...), Firestore data model (members, settings/workshop, clients, contacts, projects, boxes, movements, generalExpenses, catalog/*, templates, quotes, auditLog), Money as integer EUR cents, never floats, Money flow: sent/accepted quotes as future income, cobro into boxes, movements collection (cobro, gasto_proyecto, gasto_general, retiro, aporte, transferencia, reintegro) (+10 more)
 
-### Community 17 - "Geometría 3D de muebles"
-Cohesion: 0.09
-Nodes (27): three@0.186.1, three, Box3, COLORS, furnitureBoxes(), ItemGeometry, LaidOutItem, layoutItems() (+19 more)
+### Community 17 - "furniture3d.ts"
+Cohesion: 0.11
+Nodes (22): three@0.186.1, three, Box3, COLORS, furnitureBoxes(), ItemGeometry, LaidOutItem, layoutItems() (+14 more)
 
 ### Community 18 - "api.ts"
 Cohesion: 0.07
-Nodes (30): AuditEntry, Box, byCreatedDesc(), byDateDesc(), byMovementDesc(), byName(), Client, Contact (+22 more)
+Nodes (37): AuditEntry, Box, byCreatedDesc(), byDateDesc(), byMovementDesc(), byName(), Client, Contact (+29 more)
 
-### Community 19 - "TS config de Node"
+### Community 19 - "compilerOptions"
 Cohesion: 0.10
 Nodes (19): compilerOptions, allowImportingTsExtensions, erasableSyntaxOnly, lib, module, moduleDetection, moduleResolution, noEmit (+11 more)
 
-### Community 20 - "main.tsx"
-Cohesion: 0.20
-Nodes (10): createFirebaseAuthService(), isActiveMember(), memberKey(), MemberDoc, config, getFirebase(), missingFirebaseEnv, useEmulators (+2 more)
+### Community 20 - "Button"
+Cohesion: 0.18
+Nodes (20): react, Button(), ButtonProps, Dialog(), MoneyInput(), Furniture3D, Furniture3DView(), Geometry (+12 more)
 
-### Community 22 - "shopping.ts"
-Cohesion: 0.15
-Nodes (15): formatQty(), KIND_ORDER, NO_SUPPLIER, orderText(), ShoppingCatalog, ShoppingGroup, ShoppingLine, ShoppingList (+7 more)
+### Community 21 - "Plan: carpentry workshop management app"
+Cohesion: 0.40
+Nodes (5): Goal: replace Excel 'Calculo muebles presupuesto.xlsx' for 2-3 partners, Plan: carpentry workshop management app, index.html SPA entry (root div, loads /src/main.tsx), Taller NN (carpentry workshop management app), Stack: React + TypeScript + Vite, Tailwind, Firebase Spark, GitHub Pages
+
+### Community 22 - "ShoppingListCard.tsx"
+Cohesion: 0.17
+Nodes (14): formatQty(), KIND_ORDER, NO_SUPPLIER, orderText(), ShoppingCatalog, ShoppingGroup, ShoppingLine, shoppingList (+6 more)
 
 ### Community 23 - "Seguridad de Taller NN"
-Cohesion: 0.15
-Nodes (10): src/data: DataApi, firestoreApi, repo, hooks, src/domain: logica pura testeada, src/features/<area> y src/components/ui, firestore.rules (unica barrera de seguridad real), src/model: esquemas zod (COLLECTIONS, SETTINGS_DOCS), Checklist de la consola Firebase/Google Cloud, Vigilancia en vivo del socio desactivado (cierra sesion y borra cache), Acceso: Google con email verificado + members/{email} active (+2 more)
+Cohesion: 0.18
+Nodes (8): src/data: DataApi, firestoreApi, repo, hooks, firestore.rules (unica barrera de seguridad real), src/model: esquemas zod (COLLECTIONS, SETTINGS_DOCS), Checklist de la consola Firebase/Google Cloud, Vigilancia en vivo del socio desactivado (cierra sesion y borra cache), Acceso: Google con email verificado + members/{email} active, safeHref: solo enlaces http(s) en catalogo, Seguridad de Taller NN
 
-### Community 24 - "Datos de prueba del emulador"
+### Community 24 - "seed-emulator.mjs"
 Cohesion: 0.20
 Nodes (12): audit, fields(), geShares, headers, iso(), movement(), mvBase, pad() (+4 more)
 
 ### Community 25 - "domain/catalog.ts"
 Cohesion: 0.11
-Nodes (18): CatalogSeed, DB_MATERIALS, DEFAULT_SHEET, EXCEL_TEMPLATE_NAMES, EXCEL_TEMPLATES, excelSeed(), excelTemplates(), extra (+10 more)
+Nodes (17): ServiceRatesState, CatalogSeed, DB_MATERIALS, DEFAULT_SHEET, EXCEL_TEMPLATE_NAMES, EXCEL_TEMPLATES, excelSeed(), extra (+9 more)
 
-### Community 26 - "shared.ts"
-Cohesion: 0.14
-Nodes (18): applyStatus(), canTransition(), fallbackAcceptedQuote(), isAcceptedStatus(), newQuoteInput(), newVersionInput(), nextStatuses(), projectPatchForQuote() (+10 more)
-
-### Community 27 - "Disparadores del deploy"
+### Community 26 - "QuoteEditorPage.tsx"
 Cohesion: 0.17
-Nodes (11): concurrency, cancel-in-progress, group, name, on, pull_request, push, workflow_dispatch (+3 more)
+Nodes (23): applyStatus(), canTransition(), fallbackAcceptedQuote(), isAcceptedStatus(), itemFromTemplate(), newLocalId(), newQuoteInput(), newVersionInput() (+15 more)
+
+### Community 27 - "deploy.yml"
+Cohesion: 0.17
+Nodes (11): concurrency, cancel-in-progress, group, name, permissions, contents, branches, True (+3 more)
 
 ### Community 28 - "quote.ts"
-Cohesion: 0.21
-Nodes (9): CatalogLike, computeQuote(), itemAreas(), ItemLike, m2(), PanelLike, RatesLike, SheetLine (+1 more)
+Cohesion: 0.12
+Nodes (20): CatalogLike, computeQuote(), itemAreas(), ItemLike, m2(), PanelLike, QuoteTotals, RatesLike (+12 more)
 
-### Community 29 - "Build con Vite y PWA"
+### Community 29 - "vite.config.ts"
 Cohesion: 0.17
 Nodes (9): @tailwindcss/vite@^4.3.5, vite@^7.3.1, vite-plugin-pwa@^2.0.0, @vitejs/plugin-react@^5.1.1, @tailwindcss/vite, vite, vite-plugin-pwa, @vitejs/plugin-react (+1 more)
 
-### Community 30 - "Scripts npm"
+### Community 30 - "scripts"
 Cohesion: 0.17
 Nodes (12): scripts, build, coverage, dev, dev:emulators, lint, preview, test (+4 more)
 
@@ -230,45 +236,41 @@ Nodes (12): eslint@^9.39.1, @eslint/js@^9.39.1, eslint-plugin-react-hooks@^7.0.1
 
 ### Community 32 - "package.json"
 Cohesion: 0.14
-Nodes (13): @firebase/rules-unit-testing@^6.0.0, @types/three@0.186.0, typescript@~5.9.3, @grpc/grpc-js, name, overrides, @firebase/firestore, private (+5 more)
+Nodes (13): @types/react@^19.2.7, @types/three@0.186.0, typescript@~5.9.3, @grpc/grpc-js, name, overrides, @firebase/firestore, private (+5 more)
 
-### Community 33 - "downloadQuotePdf"
-Cohesion: 0.33
-Nodes (6): jspdf@4.2.1, jspdf-autotable@5.0.9, jspdf, jspdf-autotable, downloadQuotePdf(), toDataUrl()
-
-### Community 34 - "Jobs del CI"
+### Community 34 - "jobs"
 Cohesion: 0.20
 Nodes (10): if, needs, runs-on, runs-on, runs-on, timeout-minutes, jobs, build (+2 more)
 
-### Community 35 - "Job de publicación en Pages"
+### Community 35 - "deploy"
 Cohesion: 0.20
 Nodes (10): environment, if, needs, permissions, runs-on, name, url, deploy (+2 more)
 
-### Community 36 - "dates.ts"
-Cohesion: 0.19
-Nodes (12): addDays(), daysBetween(), pad(), toUtcMs(), SHARES, today, seed(), SHARES (+4 more)
+### Community 36 - "todayIso"
+Cohesion: 0.18
+Nodes (13): addDays(), daysBetween(), pad(), todayIso(), toUtcMs(), today, ContactFormSchema, SHARES (+5 more)
 
-### Community 37 - "Pasos del CI"
+### Community 37 - "steps"
 Cohesion: 0.31
 Nodes (9): steps, steps, steps, steps, id, if, name, run (+1 more)
 
-### Community 38 - "Variables de Firebase en CI"
+### Community 38 - "env"
 Cohesion: 0.22
 Nodes (9): CI, VITE_BASE, VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET (+1 more)
 
-### Community 39 - "Parámetros de acciones del CI"
+### Community 39 - "with"
 Cohesion: 0.22
 Nodes (9): with, cache, distribution, java-version, name, node-version, path, persist-credentials (+1 more)
 
-### Community 40 - "Dependabot"
+### Community 40 - "updates"
 Cohesion: 0.25
 Nodes (7): interval, updates, directory, open-pull-requests-limit, package-ecosystem, schedule, version
 
 ### Community 41 - ".seedClient"
-Cohesion: 0.32
-Nodes (6): seedExpenses(), seed(), setup(), seed(), seed(), seed()
+Cohesion: 0.21
+Nodes (8): withAdmin(), seedExpenses(), seed(), seed(), seed(), seed(), seed(), ProjectData
 
-### Community 42 - "Logo e íconos"
+### Community 42 - "App-NN Brand Mark (geometric N, black slate + walnut wood on cream)"
 Cohesion: 0.52
 Nodes (7): App-NN Brand Mark (geometric N, black slate + walnut wood on cream), Apple Touch Icon 180x180 (iOS home-screen icon, split black/walnut N mark), Maskable PWA Icon 512x512 (padded safe-zone N mark), PWA Install Icon 192x192 (split black/walnut N mark), PWA Install Icon 512x512 (split black/walnut N mark), PWA Icon 64x64 (small favicon-size N mark), In-App Logo (faceted N: black slate and walnut wood pieces)
 
@@ -278,9 +280,9 @@ Nodes (9): ACTION_LABELS, FIELD_LABELS, FORM_TYPES, TYPE_LABELS, SHOWN_INLINE, S
 
 ### Community 44 - "firestore.rules as the only real security barrier"
 Cohesion: 0.20
-Nodes (7): Audit fields + auditLog + movement soft delete, Step 2: data model, Firestore rules, domain module, Movement soft delete + versioning with auditLog/{id}_v{n} and conflict detection, Quotes: only drafts deletable; sent cannot return to draft, Server-set audit fields createdBy/createdAt/updatedBy/updatedAt, Client-side zod validation (src/model), App Check + reCAPTCHA v3 (pendiente opcional)
+Nodes (7): settings/opening (saldos iniciales), Audit fields + auditLog + movement soft delete, Movement soft delete + versioning with auditLog/{id}_v{n} and conflict detection, Quotes: only drafts deletable; sent cannot return to draft, Server-set audit fields createdBy/createdAt/updatedBy/updatedAt, Client-side zod validation (src/model), App Check + reCAPTCHA v3 (pendiente opcional)
 
-### Community 45 - "TS config raíz"
+### Community 45 - "tsconfig.json"
 Cohesion: 0.33
 Nodes (5): compilerOptions, baseUrl, paths, files, references
 
@@ -292,10 +294,6 @@ Nodes (8): Comandos npm (dev, test, test:rules, test:e2e, lint, typecheck, build
 Cohesion: 0.24
 Nodes (10): 3D furniture viewer (three + @react-three/fiber, later phase), Per-furniture cost calculation (m2 structure/doors/back x price x waste factor + cutting + hardware), Quote item (furniture): dimensions, materials, doors, drawers, hardware, manual labor, geometry for 3D, Implementation steps 1-14, PDF generation in browser with @react-pdf/renderer, Step 10: quote PDF, Step 12: Playwright e2e of main flow (login to wallet), Step 13: security audit of Firestore rules and login (+2 more)
 
-### Community 50 - "clients.ts"
-Cohesion: 0.42
-Nodes (5): AlertableClient, contactAlerts(), lastTouch(), matchesSearch(), normalizeText()
-
 ### Community 51 - "Step 1: project base, Google login, layout, deploy"
 Cohesion: 0.29
 Nodes (7): React Router HashRouter, Firestore persistentLocalCache (basic offline support), Step 1: project base, Google login, layout, deploy, CI/CD: push to main runs lint, typecheck, tests, rules tests then deploys to GitHub Pages, members/{email} whitelist (lowercase id, active: true), Offline support: installable PWA + Firestore local cache, One-time setup (Firebase Auth, members collection, rules deploy, GitHub variables, Pages)
@@ -304,47 +302,39 @@ Nodes (7): React Router HashRouter, Firestore persistentLocalCache (basic offlin
 Cohesion: 0.33
 Nodes (7): Content-Security-Policy por <meta> (cspPlugin), npm audit --omit=dev (grpc-js forzado), Login falso de desarrollo solo con import.meta.env.DEV, frameGuard: no arranca dentro de un marco (clickjacking), Tabla de protecciones (riesgo / proteccion / prueba), Parametros de URL acotados (MovementNewPage), userPrefs aisladas por socio
 
-### Community 53 - "money.test.ts"
-Cohesion: 0.40
-Nodes (3): centsToEuros(), eurosToCents(), sumCents()
-
-### Community 54 - "catalog/labels.ts"
-Cohesion: 0.40
-Nodes (4): HARDWARE_KIND_LABELS, HARDWARE_UNIT_LABELS, HARDWARE_KINDS, HARDWARE_UNITS
-
 ## Ambiguous Edges - Review These
 - `DataApi` → `src/data: DataApi, firestoreApi, repo, hooks`  [AMBIGUOUS]
   CLAUDE.md · relation: references
-- `cspPlugin()` → `Content-Security-Policy por <meta> (cspPlugin)`  [AMBIGUOUS]
-  SECURITY.md · relation: references
-- `firebase.ts` → `Login falso de desarrollo solo con import.meta.env.DEV`  [AMBIGUOUS]
-  SECURITY.md · relation: references
 - `dashboard.ts` → `Panel de la billetera`  [AMBIGUOUS]
   CLAUDE.md · relation: references
+- `firebase.ts` → `Login falso de desarrollo solo con import.meta.env.DEV`  [AMBIGUOUS]
+  SECURITY.md · relation: references
+- `cspPlugin()` → `Content-Security-Policy por <meta> (cspPlugin)`  [AMBIGUOUS]
+  SECURITY.md · relation: references
 
 ## Knowledge Gaps
 - **16 isolated node(s):** `index.html SPA entry (root div, loads /src/main.tsx)`, `Contact alerts (nextContactAt overdue / N days) + WhatsApp button`, `Quote totals: accepted items + free lines + justified adjustments; optional VAT`, `Money in integer cents; percentages in basis points (10000 = 100%)`, `Quotes: only drafts deletable; sent cannot return to draft` (+11 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 383 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 358 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `vitest` connect `Tests de pantallas` to `generalExpenses.ts`, `dashboard.ts`, `quotePdf.ts`, `devDependencies`, `Tests e2e (Playwright)`, `Esquemas zod y auditoría`, `Capa Firestore`, `projects.ts`, `Geometría 3D de muebles`, `api.ts`, `main.tsx`, `shopping.ts`, `domain/catalog.ts`, `shared.ts`, `quote.ts`, `Build con Vite y PWA`, `package.json`, `dates.ts`, `clients.ts`, `money.test.ts`?**
-  _High betweenness centrality (0.085) - this node is a cross-community bridge._
+- **Why does `vitest` connect `vitest` to `package.json`, `generalExpenses.ts`, `dashboard.ts`, `AuthProvider.tsx`, `todayIso`, `devDependencies`, `support.ts`, `index.ts`, `firestoreApi.ts`, `GeneralExpenseFormPage.tsx`, `furniture3d.ts`, `Button`, `ShoppingListCard.tsx`, `domain/catalog.ts`, `QuoteEditorPage.tsx`, `quote.ts`, `vite.config.ts`?**
+  _High betweenness centrality (0.102) - this node is a cross-community bridge._
 - **What connects `index.html SPA entry (root div, loads /src/main.tsx)`, `Contact alerts (nextContactAt overdue / N days) + WhatsApp button`, `Quote totals: accepted items + free lines + justified adjustments; optional VAT` to the rest of the system?**
   _16 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `QuoteEditorPage.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.12903225806451613 - nodes in this community are weakly interconnected._
-- **Why does `@playwright/test` connect `Tests e2e (Playwright)` to `package.json`, `devDependencies`?**
-  _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **Should `hooks.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.052857414087715965 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05942357512953368 - nodes in this community are weakly interconnected._
+- **Why does `FakeDataApi` connect `FakeDataApi` to `setup`, `todayIso`, `vitest`, `.seedClient`, `DataApi`, `GeneralExpenseFormPage.tsx`, `api.ts`, `Seguridad de Taller NN`, `domain/catalog.ts`?**
+  _High betweenness centrality (0.075) - this node is a cross-community bridge._
+- **Should `dashboard.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.10338164251207729 - nodes in this community are weakly interconnected._
 
 ### Low-confidence Hints
 _AMBIGUOUS edges — the extractor was unsure. Verify before acting on these._
 
 - **What is the exact relationship between `DataApi` and `src/data: DataApi, firestoreApi, repo, hooks`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
-- **What is the exact relationship between `cspPlugin()` and `Content-Security-Policy por <meta> (cspPlugin)`?**
+- **What is the exact relationship between `dashboard.ts` and `Panel de la billetera`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._

@@ -168,13 +168,20 @@ service cloud.firestore {
     // ---- Movimientos de dinero: versionados, auditados, sin borrado físico ---
     function optId(v) { return v == null || (v is string && v.size() > 0 && v.size() <= 128); }
     function isId(v) { return v is string && v.size() > 0 && v.size() <= 128; }
-    // Socio referenciado (quién pagó / retiro…) debe existir en members.
+    // Socio referenciado (quién pagó / retiro…) debe existir en members…
     function optMember(v) {
       return v == null || (v is string && exists(/databases/$(database)/documents/members/$(v)));
     }
+    // …y ser un socio, no un administrador (el admin entra a la app pero queda fuera
+    // de los repartos y saldos). Sin `role` = socio.
+    function isPartnerDoc(v) {
+      return get(/databases/$(database)/documents/members/$(v)).data.get('role', 'socio') != 'admin';
+    }
     // …y estar activo al asignarlo (un movimiento viejo de un ex socio se puede seguir corrigiendo).
     function optActiveMember(v) {
-      return v == null || (v is string && get(/databases/$(database)/documents/members/$(v)).data.active == true);
+      return v == null || (v is string
+        && get(/databases/$(database)/documents/members/$(v)).data.active == true
+        && isPartnerDoc(v));
     }
     function memberFieldOk(field) {
       return (resource != null && request.resource.data[field] == resource.data[field])

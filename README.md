@@ -32,6 +32,8 @@ npm run dev
    - **ID del documento:** el email de Google en minúsculas, por ejemplo `nombre@gmail.com`.
    - **Campos:** `name` (string) y `active` (boolean, `true`).
 
+   - **Administrador (opcional):** para alguien que entra a la web pero **no es socio**, agregar además `role` (string) = `admin`. Trabaja como un socio (ve y edita todo), pero no aparece en repartos, saldos ni «quién pagó», y las reglas rechazan asignarle pagos, retiros o repartos. Sin `role` es socio.
+
    Solo los emails con `active: true` pueden entrar. Los socios se agregan **solo desde la consola**: la app no puede escribir en `members`.
 4. **Publicar las reglas de Firestore** (cada vez que cambie `firestore.rules`):
    ```bash

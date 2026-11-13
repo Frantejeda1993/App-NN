@@ -12,6 +12,7 @@ import type {
   HardwareDataSchema,
   MaterialData,
   MaterialDataSchema,
+  MemberRole,
   ServiceRates,
   TemplateData,
   TemplateDataSchema,
@@ -56,6 +57,7 @@ export interface Member {
   email: string
   name: string
   active: boolean
+  role: MemberRole
 }
 
 export type Material = Stored<MaterialData>

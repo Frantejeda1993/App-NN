@@ -66,8 +66,8 @@ export class FakeDataApi implements DataApi {
   clients = new Map<string, Client>()
   contacts = new Map<string, Contact[]>()
   members: Member[] = [
-    { email: 'nacho@gmail.com', name: 'Nacho', active: true },
-    { email: 'nahuel@gmail.com', name: 'Nahuel', active: true },
+    { email: 'nacho@gmail.com', name: 'Nacho', active: true, role: 'socio' },
+    { email: 'nahuel@gmail.com', name: 'Nahuel', active: true, role: 'socio' },
   ]
   settings: WorkshopSettings = WorkshopSettingsSchema.parse({})
   settingsExists = false
@@ -117,6 +117,14 @@ export class FakeDataApi implements DataApi {
   }
 
   // ---- helpers de test ----
+  /** Usuario administrador: entra a la app pero no es socio. */
+  seedAdmin(email: string, name: string): Member {
+    const m: Member = { email, name, active: true, role: 'admin' }
+    this.members = [...this.members, m]
+    this.emit()
+    return m
+  }
+
   seedClient(data: Partial<ClientData> & { name: string }, id = `c${++this.seq}`): Client {
     const c: Client = { ...ClientDataSchema.parse(data), ...this.stamp('nacho@gmail.com'), id }
     this.clients.set(id, c)

@@ -35,6 +35,8 @@ const client = (name, extra) => ({
 
 await put(`members/${DEV_EMAIL}`, { name: 'Dev', active: true })
 await put('members/nahuel@taller.test', { name: 'Nahuel', active: true })
+// Administrador de prueba: entra a la app pero no es socio (ni en repartos ni en saldos).
+await put('members/admin@taller.test', { name: 'Admin', active: true, role: 'admin' })
 await put('clients/demo-raquel', client('Raquel Montmeló', { phone: '610602069', source: 'Wallapop', lastContactAt: iso(-20) }))
 await put('clients/demo-james', client('James', { phone: '611222333', source: 'Wallapop', lastContactAt: iso(-3), nextContactAt: iso(-1) }))
 await put('clients/demo-abraham', client('Abraham', { source: 'Recomendación', lastContactAt: iso(-2), nextContactAt: iso(5) }))

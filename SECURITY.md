@@ -9,6 +9,10 @@ mensajes, pero nunca se confía solo en eso.
 - **Quién entra:** cuenta de Google con email verificado **y** documento `members/{email}` con
   `active: true`. La lista de socios solo se cambia desde la consola de Firebase; desde la app es
   imposible (ni agregarse a uno mismo).
+- **Administrador:** `members/{email}` con `role: 'admin'` entra con el mismo acceso que un socio
+  (de confianza, queda registrado quién y cuándo), pero no es socio: la app lo deja fuera de
+  repartos, saldos y selectores, y las reglas rechazan asignarle `paidBy`/`memberEmail`. No puede
+  cambiar su rol (nadie escribe en `members` desde la app).
 - **Los socios son de confianza:** todos pueden hacer todo, pero queda registrado quién y cuándo
   (lo fija el servidor, no se puede firmar como otro).
 - **Dinero:** los movimientos son estrictos (campos exactos, tipos, importes positivos), versionados

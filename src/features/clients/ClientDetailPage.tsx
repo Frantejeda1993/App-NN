@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge, Card } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
-import { useClient, useContacts, useMembers, useProjects, useWorkshopSettings } from '@/data/hooks'
+import { useAllMembers, useClient, useContacts, useProjects, useWorkshopSettings } from '@/data/hooks'
 import { STATUS_LABELS, STATUS_TONES } from '@/features/projects/labels'
 import { whatsappLink } from '@/domain/clients'
 import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
@@ -22,7 +22,8 @@ export function ClientDetailPage() {
   const me = useMyEmail()
   const client = useClient(id)
   const contacts = useContacts(id)
-  const members = useMembers()
+  // Solo para el nombre de quién cargó cada contacto: incluye al administrador.
+  const members = useAllMembers()
   const settings = useWorkshopSettings()
   const allProjects = useProjects()
   // Versión del cliente al empezar a editar (para no pisar cambios de otro socio).

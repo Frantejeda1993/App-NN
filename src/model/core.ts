@@ -12,9 +12,15 @@ import {
 } from './common'
 
 // ---- members/{email} (solo lectura desde la app; se crean en la consola) ----
+// `admin` entra y trabaja en la app, pero no es socio: no participa de los repartos,
+// los saldos ni los selectores de «quién pagó». Sin `role` = socio.
+export const MEMBER_ROLES = ['socio', 'admin'] as const
+export type MemberRole = (typeof MEMBER_ROLES)[number]
+
 export const MemberDataSchema = z.object({
   name: nameSchema,
   active: z.boolean(),
+  role: z.enum(MEMBER_ROLES).default('socio'),
 })
 export type MemberData = z.infer<typeof MemberDataSchema>
 
