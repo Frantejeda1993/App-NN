@@ -11,6 +11,8 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/rules/**/*.test.ts'],
     testTimeout: 20000,
+    // Conectarse al emulador recién levantado puede tardar más de 10 s.
+    hookTimeout: 60000,
     fileParallelism: false,
   },
 })

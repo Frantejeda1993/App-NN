@@ -181,23 +181,20 @@ service cloud.firestore {
         || optActiveMember(request.resource.data[field]);
     }
 
-    // Reparto entre proyectos: hasta 20 partes (las reglas no tienen bucles, se
-    // revisa cada posición). Cada parte: proyecto + importe > 0; la suma = total.
+    // Reparto entre proyectos: hasta 10 partes (las reglas no tienen bucles, se
+    // revisa cada posición). Cada parte: importe entero > 0 (una parte negativa
+    // permitiría inflar otro proyecto); la suma = total. Que cada parte tenga un
+    // proyecto válido lo controla la app: revisarlo acá supera el tope de 1000
+    // expresiones que evalúan las reglas por escritura.
     function splitAt(l, i) { return l.size() > i ? l[i].amountCents : 0; }
-    function splitOk(l, i) {
-      return l.size() <= i || (l[i] is map && isId(l[i].projectId) && isPositiveCents(l[i].amountCents));
-    }
+    function splitOk(l, i) { return l.size() <= i || isPositiveCents(l[i].amountCents); }
     function splitsValid(l) {
       return splitOk(l, 0) && splitOk(l, 1) && splitOk(l, 2) && splitOk(l, 3) && splitOk(l, 4)
-        && splitOk(l, 5) && splitOk(l, 6) && splitOk(l, 7) && splitOk(l, 8) && splitOk(l, 9)
-        && splitOk(l, 10) && splitOk(l, 11) && splitOk(l, 12) && splitOk(l, 13) && splitOk(l, 14)
-        && splitOk(l, 15) && splitOk(l, 16) && splitOk(l, 17) && splitOk(l, 18) && splitOk(l, 19);
+        && splitOk(l, 5) && splitOk(l, 6) && splitOk(l, 7) && splitOk(l, 8) && splitOk(l, 9);
     }
     function splitsSum(l) {
       return splitAt(l, 0) + splitAt(l, 1) + splitAt(l, 2) + splitAt(l, 3) + splitAt(l, 4)
-        + splitAt(l, 5) + splitAt(l, 6) + splitAt(l, 7) + splitAt(l, 8) + splitAt(l, 9)
-        + splitAt(l, 10) + splitAt(l, 11) + splitAt(l, 12) + splitAt(l, 13) + splitAt(l, 14)
-        + splitAt(l, 15) + splitAt(l, 16) + splitAt(l, 17) + splitAt(l, 18) + splitAt(l, 19);
+        + splitAt(l, 5) + splitAt(l, 6) + splitAt(l, 7) + splitAt(l, 8) + splitAt(l, 9);
     }
 
     function validMovement() {
@@ -222,7 +219,7 @@ service cloud.firestore {
         && d.description is string && d.description.size() <= 5000
         && d.category is string && d.category.size() <= 100
         && optId(d.boxId) && optId(d.toBoxId) && optId(d.projectId) && optId(d.generalExpenseId)
-        && d.projectSplits is list && d.projectSplits.size() <= 20
+        && d.projectSplits is list && d.projectSplits.size() <= 10
         && optMember(d.paidBy) && optMember(d.memberEmail)
         // Reglas por tipo (espejo de MovementDataSchema): un dato suelto que no
         // corresponde al tipo no puede sumar en otro lado (p. ej. reparto en un cobro).

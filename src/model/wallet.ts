@@ -61,8 +61,12 @@ export const MOVEMENT_STATUSES = ['pagado', 'pendiente_pago'] as const
 
 const ProjectSplitSchema = z.object({ projectId: idSchema, amountCents: positiveCentsSchema })
 
-/** Máximo de partes de un reparto entre proyectos (las reglas suman cada una). */
-export const MAX_PROJECT_SPLITS = 20
+/**
+ * Máximo de partes de un reparto entre proyectos. Las reglas revisan y suman
+ * cada parte por separado y tienen un tope de 1000 expresiones por escritura:
+ * con más partes se pasaría ese tope y Firestore rechazaría el movimiento.
+ */
+export const MAX_PROJECT_SPLITS = 10
 
 /** Tipos de movimiento que llevan un socio. */
 export const MEMBER_MOVEMENT_TYPES: readonly MovementType[] = ['retiro', 'aporte', 'reintegro', 'reparto']

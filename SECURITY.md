@@ -14,7 +14,7 @@ mensajes, pero nunca se confía solo en eso.
 - **Dinero:** los movimientos son estrictos (campos exactos, tipos, importes positivos), versionados
   y con un historial (`auditLog`) que debe coincidir con el cambio y no se puede editar ni borrar.
   Las reglas también exigen los datos según el tipo: un campo que no corresponde (p. ej. un reparto
-  entre proyectos en un cobro) se rechaza, las partes de un reparto (hasta 20) suman el total, la
+  entre proyectos en un cobro) se rechaza, las partes de un reparto (hasta 10, por el tope de evaluación de las reglas) suman el total, la
   fecha es AAAA-MM-DD válida y solo se asigna a socios activos. No hay borrado físico: las bajas son
   lógicas y **el motivo es obligatorio**.
 - **Ediciones simultáneas:** presupuestos y proyectos llevan un contador `rev` que las reglas exigen

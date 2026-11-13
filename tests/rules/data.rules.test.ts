@@ -581,6 +581,32 @@ describe('movimientos: reglas cruzadas (revisión de seguridad)', () => {
     await assertFails(rawMovement(db, 'x4', { ...gasto, projectId: 'p1', projectSplits: [{ projectId: 'p1', amountCents: 10000 }] }))
   })
 
+  it('un reparto con el máximo de 10 partes entra en el límite de evaluación; 11 se rechaza', async () => {
+    const gasto = { type: 'gasto_proyecto', projectId: null }
+    const parts = (n: number) => Array.from({ length: n }, (_, i) => ({ projectId: `p${i}`, amountCents: 1000 }))
+    await assertSucceeds(rawMovement(dbAs(NACHO), 'x10a', { ...gasto, amountCents: 10000, projectSplits: parts(10) }))
+    await assertFails(rawMovement(dbAs(NACHO), 'x11a', { ...gasto, amountCents: 11000, projectSplits: parts(11) }))
+    // Una parte negativa compensada (inflaría otro proyecto) se rechaza aunque la suma dé.
+    await assertFails(
+      rawMovement(dbAs(NACHO), 'x12a', {
+        ...gasto,
+        projectSplits: [{ projectId: 'p1', amountCents: 1_000_000 }, { projectId: 'p2', amountCents: -990_000 }],
+      }),
+    )
+  })
+
+  it('un gasto repartido en 10 proyectos se crea, se edita y se da de baja con la app', async () => {
+    const db = dbAs(NACHO)
+    const splits = Array.from({ length: 10 }, (_, i) => ({ projectId: `p${i}`, amountCents: 1000 }))
+    const input = { type: 'gasto_proyecto', amountCents: 10000, date: '2026-11-07', boxId: 'b1', projectSplits: splits } as const
+    const { id, committed } = createMovement(db, input, NACHO)
+    await assertSucceeds(committed)
+    const v1 = await loadMovement(db, id)
+    await assertSucceeds(updateMovement(db, v1, MovementDataSchema.parse({ ...input, description: 'Compra compartida' }), NACHO).committed)
+    const v2 = await loadMovement(db, id)
+    await assertSucceeds(deleteMovement(db, v2, 'Cargado dos veces', NACHO).committed)
+  })
+
   it('campos que no corresponden al tipo se rechazan', async () => {
     const db = dbAs(NACHO)
     await assertFails(rawMovement(db, 'x5', { type: 'retiro', projectId: 'p1', memberEmail: NACHO }))

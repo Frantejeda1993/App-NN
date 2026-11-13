@@ -92,6 +92,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Los tests de pantallas con muchos clics tardan más de 5 s con la suite completa en paralelo.
+    testTimeout: 20000,
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
