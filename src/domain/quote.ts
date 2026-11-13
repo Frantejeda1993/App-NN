@@ -1,7 +1,12 @@
 /**
  * Cálculo del presupuesto (puro, en céntimos). Reglas acordadas:
- * - m² estructura = 2·alto·prof + 2·ancho·prof + estantes·ancho·prof; frentes = ancho·alto·puertas;
- *   trasera = ancho·alto. Todo × cantidad.
+ * - m² estructura = 2·alto·prof + 2·ancho·prof + estantes·ancho·prof + divisiones·alto·prof;
+ *   frentes = ancho·alto si tiene puertas o cajones (las puertas y los cajones se reparten el
+ *   frente, como en la vista 3D); trasera = ancho·alto. Todo × cantidad.
+ * - Importes escritos a mano en € (otros herrajes, mano de obra, complejidad, precio final) son
+ *   del renglón completo: no se multiplican por la cantidad.
+ * - Aceptación parcial: los ajustes se prorratean según la parte aceptada y la seña se calcula
+ *   sobre el total aceptado.
  * - Placas enteras: por material se suman los m² × desperdicio de todos los muebles,
  *   se redondea hacia arriba a placas y ese coste se reparte entre los muebles según sus m².
  * - Corte/canteado = m² totales × tarifa; canto = metros × precio.
@@ -24,6 +29,8 @@ export interface ItemLike {
   heightMm: number
   depthMm: number
   shelves: number
+  /** Divisiones verticales (opcional en datos viejos). */
+  dividers?: number
   structure: PanelLike
   back: PanelLike | null
   fronts: PanelLike
@@ -103,13 +110,20 @@ export interface QuoteTotals {
 }
 
 const m2 = (a: number, b: number) => (a * b) / 1_000_000
-const round = (x: number) => Math.round(x)
+/** Redondeo simétrico (lejos de 0): −2,5 → −3 igual que 2,5 → 3. */
+const round = (x: number) => (x === 0 ? 0 : Math.sign(x) * Math.round(Math.abs(x)))
 
 /** m² por panel (ya multiplicado por la cantidad). */
 export function itemAreas(i: ItemLike) {
   const q = i.quantity
-  const structure = (2 * m2(i.heightMm, i.depthMm) + 2 * m2(i.widthMm, i.depthMm) + i.shelves * m2(i.widthMm, i.depthMm)) * q
-  const fronts = m2(i.widthMm, i.heightMm) * i.doors.count * q
+  const structure =
+    (2 * m2(i.heightMm, i.depthMm) +
+      2 * m2(i.widthMm, i.depthMm) +
+      i.shelves * m2(i.widthMm, i.depthMm) +
+      (i.dividers ?? 0) * m2(i.heightMm, i.depthMm)) *
+    q
+  const hasFronts = i.doors.count + i.drawers.count > 0
+  const fronts = hasFronts ? m2(i.widthMm, i.heightMm) * q : 0
   const back = i.back ? m2(i.widthMm, i.heightMm) * q : 0
   return { structure, fronts, back, total: structure + fronts + back }
 }
@@ -214,8 +228,13 @@ export function computeQuote(
 
   const acceptedItems = items.filter((_, idx) => quote.items[idx].accepted).reduce((s, b) => s + b.totalCents, 0)
   const acceptedLines = quote.freeLines.filter((l) => l.accepted).reduce((s, l) => s + l.amountCents, 0)
-  const acceptedSub = acceptedItems + acceptedLines + adjustmentsCents
-  const acceptedTotalCents = acceptedSub + round((acceptedSub * quote.vatBp) / 10000)
+  const acceptedBase = acceptedItems + acceptedLines
+  const fullBase = itemsCents + freeLinesCents
+  const allAccepted = quote.items.every((i) => i.accepted) && quote.freeLines.every((l) => l.accepted)
+  // Los ajustes (descuentos, diseño…) se prorratean según la parte aceptada.
+  const acceptedAdjustments = allAccepted || fullBase === 0 ? adjustmentsCents : round((adjustmentsCents * acceptedBase) / fullBase)
+  const acceptedSub = Math.max(0, acceptedBase + acceptedAdjustments)
+  const acceptedTotalCents = allAccepted ? totalCents : acceptedSub + round((acceptedSub * quote.vatBp) / 10000)
 
   const materialsTotal = sheets.reduce((s, x) => s + x.costCents, 0)
   return {
@@ -228,7 +247,8 @@ export function computeQuote(
     vatCents,
     totalCents,
     acceptedTotalCents,
-    depositCents: round((totalCents * quote.depositBp) / 10000),
+    // Seña sobre lo que el cliente aceptó (si aceptó todo, es el total).
+    depositCents: round((acceptedTotalCents * quote.depositBp) / 10000),
     multiplierRefCents: rates.materialsMultiplier > 0 ? round(materialsTotal * rates.materialsMultiplier) : 0,
   }
 }

@@ -79,15 +79,28 @@ export function newVersionInput(q: QuoteData & { id: string }, today: string, va
     items: rest.items.map((i) => ({ ...i, accepted: true })),
     freeLines: rest.freeLines.map((l) => ({ ...l, accepted: true })),
     purchased: [],
+    // Todo vuelve a estar aceptado: el total aceptado es el total (hasta que se recalcule al guardar).
+    totals: { ...rest.totals, acceptedTotalCents: rest.totals.totalCents },
+    // Documento nuevo: el contador de escrituras arranca de cero.
+    rev: 0,
   }
 }
+
+/** Estados desde los que volver a "enviado" es reabrir (nuevo envío, fechas nuevas). */
+const REOPEN_FROM: QuoteStatus[] = ['rechazado', 'vencido', 'archivado']
 
 /** Cambia de estado fijando fechas y, al aceptar entero, marca todo como aceptado. */
 export function applyStatus<T extends QuoteData>(q: T, to: QuoteStatus, today: string): T {
   if (!canTransition(q.status, to)) throw new Error(`No se puede pasar de ${STATUS_LABELS[q.status]} a ${STATUS_LABELS[to]}`)
-  const next: T = { ...q, status: to }
-  if (to === 'enviado') next.sentAt = q.sentAt ?? today
-  if (to === 'aceptado' || to === 'aceptado_parcial') next.acceptedAt = q.acceptedAt ?? today
+  const reopening = to === 'enviado' && REOPEN_FROM.includes(q.status)
+  const next: T = {
+    ...q,
+    status: to,
+    // Reabrir es un envío nuevo: la fecha de envío es hoy y la aceptación anterior ya no vale.
+    sentAt: to === 'enviado' ? (reopening ? today : (q.sentAt ?? today)) : q.sentAt,
+    acceptedAt: reopening ? null : q.acceptedAt,
+  }
+  if (to === 'aceptado' || to === 'aceptado_parcial') next.acceptedAt = next.acceptedAt ?? today
   if (to === 'aceptado') {
     next.items = q.items.map((i) => ({ ...i, accepted: true }))
     next.freeLines = q.freeLines.map((l) => ({ ...l, accepted: true }))
@@ -99,7 +112,9 @@ export function applyStatus<T extends QuoteData>(q: T, to: QuoteStatus, today: s
  * Qué cambiar en el proyecto al cambiar el estado de un presupuesto:
  * - enviado: fecha de presupuesto si faltaba.
  * - aceptado / parcial / finalizado: queda como presupuesto aceptado del proyecto.
- * - rechazado / vencido / archivado: si era el aceptado, deja de serlo.
+ * - rechazado / vencido / archivado: si era el aceptado, deja de serlo y pasa a
+ *   serlo otro presupuesto aceptado del proyecto (`fallbackAcceptedId`), si hay.
+ * - Archivar un presupuesto FINALIZADO no lo desvincula: el trabajo se hizo.
  * Devuelve null si no hay nada que cambiar.
  */
 export function projectPatchForQuote(
@@ -110,11 +125,26 @@ export function projectPatchForQuote(
     sentAt: string | null
     acceptedAt: string | null
   },
+  opts: { previousStatus?: QuoteStatus; fallbackAcceptedId?: string | null } = {},
 ): { acceptedQuoteId?: string | null; quotedAt?: string } | null {
   const patch: { acceptedQuoteId?: string | null; quotedAt?: string } = {}
   const sent = quote.sentAt ?? quote.acceptedAt
   if (quote.status !== 'borrador' && !project.quotedAt && sent) patch.quotedAt = sent
   if (isAcceptedStatus(quote.status) && project.acceptedQuoteId !== quote.id) patch.acceptedQuoteId = quote.id
-  if (['rechazado', 'vencido', 'archivado'].includes(quote.status) && project.acceptedQuoteId === quote.id) patch.acceptedQuoteId = null
+  const archivedDone = quote.status === 'archivado' && opts.previousStatus === 'finalizado'
+  const dropped = ['rechazado', 'vencido', 'archivado'].includes(quote.status) && !archivedDone
+  if (dropped && project.acceptedQuoteId === quote.id) patch.acceptedQuoteId = opts.fallbackAcceptedId ?? null
   return Object.keys(patch).length > 0 ? patch : null
+}
+
+/** Otro presupuesto aceptado del mismo proyecto (el más reciente), para no dejar el proyecto sin aceptado. */
+export function fallbackAcceptedQuote(
+  quotes: { id: string; projectId: string | null; status: QuoteStatus; acceptedAt: string | null }[],
+  projectId: string,
+  excludeId: string,
+): string | null {
+  const candidates = quotes
+    .filter((q) => q.projectId === projectId && q.id !== excludeId && isAcceptedStatus(q.status))
+    .sort((a, b) => (b.acceptedAt ?? '').localeCompare(a.acceptedAt ?? ''))
+  return candidates[0]?.id ?? null
 }

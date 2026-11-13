@@ -60,6 +60,18 @@ service cloud.firestore {
     // Tope de campos por documento (evita inflar documentos con basura).
     function sizeOk() { return request.resource.data.size() <= 40; }
 
+    // Fecha de negocio "AAAA-MM-DD".
+    function isIsoDate(v) {
+      return v is string && v.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+    }
+
+    // Concurrencia optimista: cada escritura sube `rev` en 1. Si otro socio guardó
+    // antes, el `rev` que manda este cliente ya no es el siguiente y se rechaza.
+    function revCreateOk() { return request.resource.data.get('rev', 0) == 0; }
+    function revUpdateOk() {
+      return request.resource.data.get('rev', 0) == resource.data.get('rev', 0) + 1;
+    }
+
     // ---- Lista blanca -------------------------------------------------------
     // Los socios se dan de alta desde la consola de Firebase (nunca desde la app).
     match /members/{email} {
@@ -77,10 +89,20 @@ service cloud.firestore {
       return !('defaultShares' in d) || d.defaultShares == null || validShares(d.defaultShares);
     }
 
+    // Configuración inicial de la billetera: mapas acotados (los importes los valida la app).
+    function validOpening(docId) {
+      let d = request.resource.data;
+      return docId != 'opening' || (
+        d.boxes is map && d.boxes.size() <= 50
+        && d.people is map && d.people.size() <= 21
+        && (d.date == null || isIsoDate(d.date))
+      );
+    }
+
     match /settings/{docId} {
       allow read: if isMember();
-      allow create: if canCreate() && docId in ['workshop', 'services'] && validSettings();
-      allow update: if canUpdate() && validSettings();
+      allow create: if canCreate() && docId in ['workshop', 'services', 'opening'] && validSettings() && validOpening(docId);
+      allow update: if canUpdate() && validSettings() && validOpening(docId);
       allow delete: if false;
     }
 
@@ -97,9 +119,10 @@ service cloud.firestore {
 
       match /contacts/{contactId} {
         allow read: if isMember();
-        allow create: if canCreate() && request.resource.data.date is string;
-        allow update: if canUpdate() && request.resource.data.date is string;
-        allow delete: if isMember();
+        allow create: if canCreate() && isIsoDate(request.resource.data.date);
+        allow update: if canUpdate() && isIsoDate(request.resource.data.date);
+        // El historial de contactos se conserva (como los clientes).
+        allow delete: if false;
       }
     }
 
@@ -114,8 +137,8 @@ service cloud.firestore {
 
     match /projects/{projectId} {
       allow read: if isMember();
-      allow create: if canCreate() && validProject();
-      allow update: if canUpdate() && validProject();
+      allow create: if canCreate() && validProject() && revCreateOk();
+      allow update: if canUpdate() && validProject() && revUpdateOk();
       allow delete: if false; // se archivan
     }
 
@@ -149,6 +172,33 @@ service cloud.firestore {
     function optMember(v) {
       return v == null || (v is string && exists(/databases/$(database)/documents/members/$(v)));
     }
+    // …y estar activo al asignarlo (un movimiento viejo de un ex socio se puede seguir corrigiendo).
+    function optActiveMember(v) {
+      return v == null || (v is string && get(/databases/$(database)/documents/members/$(v)).data.active == true);
+    }
+    function memberFieldOk(field) {
+      return (resource != null && request.resource.data[field] == resource.data[field])
+        || optActiveMember(request.resource.data[field]);
+    }
+
+    // Reparto entre proyectos: hasta 20 partes (las reglas no tienen bucles, se
+    // revisa cada posición). Cada parte: proyecto + importe > 0; la suma = total.
+    function splitAt(l, i) { return l.size() > i ? l[i].amountCents : 0; }
+    function splitOk(l, i) {
+      return l.size() <= i || (l[i] is map && isId(l[i].projectId) && isPositiveCents(l[i].amountCents));
+    }
+    function splitsValid(l) {
+      return splitOk(l, 0) && splitOk(l, 1) && splitOk(l, 2) && splitOk(l, 3) && splitOk(l, 4)
+        && splitOk(l, 5) && splitOk(l, 6) && splitOk(l, 7) && splitOk(l, 8) && splitOk(l, 9)
+        && splitOk(l, 10) && splitOk(l, 11) && splitOk(l, 12) && splitOk(l, 13) && splitOk(l, 14)
+        && splitOk(l, 15) && splitOk(l, 16) && splitOk(l, 17) && splitOk(l, 18) && splitOk(l, 19);
+    }
+    function splitsSum(l) {
+      return splitAt(l, 0) + splitAt(l, 1) + splitAt(l, 2) + splitAt(l, 3) + splitAt(l, 4)
+        + splitAt(l, 5) + splitAt(l, 6) + splitAt(l, 7) + splitAt(l, 8) + splitAt(l, 9)
+        + splitAt(l, 10) + splitAt(l, 11) + splitAt(l, 12) + splitAt(l, 13) + splitAt(l, 14)
+        + splitAt(l, 15) + splitAt(l, 16) + splitAt(l, 17) + splitAt(l, 18) + splitAt(l, 19);
+    }
 
     function validMovement() {
       let d = request.resource.data;
@@ -156,30 +206,43 @@ service cloud.firestore {
         'projectId', 'projectSplits', 'generalExpenseId', 'category', 'description',
         'version', 'deleted', 'deletedReason', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'];
       let isExpense = d.type in ['gasto_proyecto', 'gasto_general'];
-      let usesMember = d.type in ['retiro', 'aporte', 'reintegro'];
+      let usesMember = d.type in ['retiro', 'aporte', 'reintegro', 'reparto'];
+      let usesMemberBox = d.type in ['retiro', 'aporte', 'reintegro'];
+      let hasSplits = d.projectSplits is list && d.projectSplits.size() > 0;
       return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
-        && d.type in ['cobro', 'gasto_proyecto', 'gasto_general', 'retiro', 'aporte', 'transferencia', 'reintegro']
+        && d.type in ['cobro', 'gasto_proyecto', 'gasto_general', 'retiro', 'aporte', 'transferencia', 'reintegro', 'reparto']
         && d.status in ['pagado', 'pendiente_pago']
         && isPositiveCents(d.amountCents)
-        && d.date is string && d.date.size() == 10
+        && isIsoDate(d.date)
         && d.version is int
         && d.deleted is bool
         && d.deletedReason is string && d.deletedReason.size() <= 500
+        // Una baja lógica siempre lleva motivo.
+        && (d.deleted == false || d.deletedReason.size() > 0)
         && d.description is string && d.description.size() <= 5000
         && d.category is string && d.category.size() <= 100
         && optId(d.boxId) && optId(d.toBoxId) && optId(d.projectId) && optId(d.generalExpenseId)
-        && d.projectSplits is list && d.projectSplits.size() <= 50
+        && d.projectSplits is list && d.projectSplits.size() <= 20
         && optMember(d.paidBy) && optMember(d.memberEmail)
-        // Reglas por tipo (espejo de MovementDataSchema).
+        // Reglas por tipo (espejo de MovementDataSchema): un dato suelto que no
+        // corresponde al tipo no puede sumar en otro lado (p. ej. reparto en un cobro).
         && (d.status == 'pagado' || isExpense)
         && (d.type == 'transferencia' || d.toBoxId == null)
         && (isExpense || d.paidBy == null)
         && (usesMember || d.memberEmail == null)
+        && (d.type in ['cobro', 'gasto_proyecto'] || d.projectId == null)
+        && (d.type == 'gasto_general' || d.generalExpenseId == null)
+        && (d.type == 'gasto_proyecto' || !hasSplits)
+        && !(d.projectId != null && hasSplits)
+        && (!hasSplits || (splitsValid(d.projectSplits) && splitsSum(d.projectSplits) == d.amountCents))
+        && (d.status == 'pagado' || (d.boxId == null && d.paidBy == null))
         && (d.type != 'cobro' || (isId(d.projectId) && isId(d.boxId)))
-        && (!usesMember || (d.memberEmail != null && isId(d.boxId)))
+        && (!usesMemberBox || (d.memberEmail != null && isId(d.boxId)))
+        // El reparto del fondo del taller no mueve dinero de las cajas.
+        && (d.type != 'reparto' || (d.memberEmail != null && d.boxId == null))
         && (d.type != 'transferencia' || (isId(d.boxId) && isId(d.toBoxId) && d.boxId != d.toBoxId))
         && (d.type != 'gasto_general' || isId(d.generalExpenseId))
-        && (d.type != 'gasto_proyecto' || isId(d.projectId) || d.projectSplits.size() > 0)
+        && (d.type != 'gasto_proyecto' || isId(d.projectId) || hasSplits)
         && (!isExpense || d.status != 'pagado' || ((d.boxId == null) != (d.paidBy == null)));
     }
 
@@ -191,10 +254,12 @@ service cloud.firestore {
     match /movements/{movementId} {
       allow read: if isMember();
       allow create: if canCreate() && validMovement()
+        && memberFieldOk('paidBy') && memberFieldOk('memberEmail')
         && request.resource.data.version == 1
         && request.resource.data.deleted == false
         && hasAuditLog(movementId, 1);
       allow update: if canUpdate() && validMovement()
+        && memberFieldOk('paidBy') && memberFieldOk('memberEmail')
         && resource.data.deleted == false
         && request.resource.data.version == resource.data.version + 1
         && hasAuditLog(movementId, request.resource.data.version);
@@ -281,10 +346,10 @@ service cloud.firestore {
 
     match /quotes/{quoteId} {
       allow read: if isMember();
-      allow create: if canCreate() && validQuote();
+      allow create: if canCreate() && validQuote() && revCreateOk();
       // Un presupuesto ya enviado no puede volver a borrador (se podría borrar)
-      // ni cambiar de número de versión.
-      allow update: if canUpdate() && validQuote()
+      // ni cambiar de número de versión; `rev` evita pisar el guardado de otro socio.
+      allow update: if canUpdate() && validQuote() && revUpdateOk()
         && (request.resource.data.status != 'borrador' || resource.data.status == 'borrador')
         && request.resource.data.version == resource.data.version;
       // Solo se borran borradores; el resto se archiva.

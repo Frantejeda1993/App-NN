@@ -20,6 +20,7 @@ import type {
   MovementControl,
   MovementData,
   MovementDataSchema,
+  OpeningBalances,
   ProjectData,
   ProjectDataSchema,
   QuoteData,
@@ -73,6 +74,20 @@ export interface SettingsState {
   exists: boolean
 }
 
+export interface OpeningState {
+  opening: OpeningBalances
+  /** false = todavía no se cargó la configuración inicial. */
+  exists: boolean
+}
+
+/** Reparto del fondo común del taller: un movimiento por socio, todos juntos. */
+export interface DistributionInput {
+  date: string
+  description: string
+  /** Céntimos para cada socio (email). */
+  shares: Record<string, number>
+}
+
 /**
  * Todo lo que las pantallas leen y escriben. La implementación real usa
  * Firestore en tiempo real (`firestoreApi.ts`); los tests usan una en memoria.
@@ -95,8 +110,12 @@ export interface DataApi {
   watchQuotes(cb: (quotes: Quote[]) => void): Unsubscribe
   watchQuote(id: string, cb: (quote: Quote | null) => void): Unsubscribe
   createQuote(input: z.input<typeof QuoteDataSchema>, by: string): WriteResult
-  /** `next` es el presupuesto completo (no un parche). */
-  updateQuote(id: string, next: QuoteData, by: string): WriteResult
+  /**
+   * `next` es el presupuesto completo (no un parche) y `next.rev` la versión que
+   * se estaba viendo: si otro socio guardó antes, se rechaza. Si se pasa
+   * `project`, el proyecto se actualiza en el mismo lote (todo o nada).
+   */
+  updateQuote(id: string, next: QuoteData, by: string, project?: { id: string; next: ProjectData }): WriteResult
   /** Solo borradores (las reglas lo exigen); el resto se archiva. */
   deleteQuote(id: string): WriteResult
   watchGeneralExpenses(cb: (expenses: GeneralExpense[]) => void): Unsubscribe
@@ -107,12 +126,14 @@ export interface DataApi {
   watchMovements(cb: (movements: Movement[]) => void): Unsubscribe
   watchMovementHistory(movementId: string, cb: (entries: AuditEntry[]) => void): Unsubscribe
   createMovement(input: z.input<typeof MovementDataSchema>, by: string): WriteResult
+  /** Reparto del fondo del taller: un movimiento `reparto` por socio, en un solo lote. */
+  createDistribution(input: DistributionInput, by: string): WriteResult
   /** `current` es la versión que el usuario estaba viendo (detecta conflictos). */
   updateMovement(current: Movement, next: MovementData, by: string): WriteResult
   deleteMovement(current: Movement, reason: string, by: string): WriteResult
 
   createProject(input: z.input<typeof ProjectDataSchema>, by: string): WriteResult
-  /** `next` es el proyecto completo (no un parche). */
+  /** `next` es el proyecto completo (no un parche); `next.rev` = versión que se estaba viendo. */
   updateProject(id: string, next: ProjectData, by: string): WriteResult
 
   createClient(input: z.input<typeof ClientDataSchema>, by: string): WriteResult
@@ -125,6 +146,10 @@ export interface DataApi {
     by: string,
   ): WriteResult
   saveWorkshopSettings(next: WorkshopSettings, exists: boolean, by: string): WriteResult
+
+  /** Configuración inicial de la billetera (saldos de arranque). */
+  watchOpeningBalances(cb: (state: OpeningState) => void): Unsubscribe
+  saveOpeningBalances(next: OpeningBalances, exists: boolean, by: string): WriteResult
 
   /** Preferencias del usuario (`null` = todavía no tiene). Solo las propias. */
   watchMyPrefs(email: string, cb: (prefs: UserPrefs | null) => void): Unsubscribe

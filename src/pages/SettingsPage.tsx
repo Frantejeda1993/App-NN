@@ -57,6 +57,9 @@ export function SettingsPage() {
           onSubmit={handleSubmit((v) => {
             try {
               notifyWrite(api.saveWorkshopSettings({ ...state.settings, ...v }, state.exists, me), 'Ajustes guardados')
+              // Lo guardado pasa a ser la base: el formulario deja de estar "sucio"
+              // y vuelve a seguir los cambios del servidor (p. ej. de otro socio).
+              reset(v)
             } catch (e) {
               notifyError(e)
             }

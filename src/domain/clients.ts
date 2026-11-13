@@ -47,13 +47,22 @@ export interface AlertableClient {
   followUp: boolean
   lastContactAt: string | null
   nextContactAt: string | null
+  /** Alta del cliente (sirve de referencia si nunca se lo contactó). */
+  createdAt?: { toDate(): Date } | null
+}
+
+/** Último contacto o, si nunca hubo, la fecha de alta (YYYY-MM-DD). */
+function lastTouch(c: AlertableClient): string | null {
+  if (c.lastContactAt) return c.lastContactAt
+  const created = c.createdAt?.toDate?.()
+  return created && !Number.isNaN(created.getTime()) ? created.toISOString().slice(0, 10) : null
 }
 
 /**
  * Alertas de seguimiento:
  * - `due`: tienen fecha de próximo contacto hoy o ya pasada.
  * - `stale`: no tienen próximo contacto agendado y llevan más de `alertDays`
- *   días sin contacto.
+ *   días sin contacto (o desde el alta, si nunca se los contactó).
  * Solo cuentan los clientes con seguimiento activo.
  */
 export function contactAlerts<T extends AlertableClient>(
@@ -66,7 +75,9 @@ export function contactAlerts<T extends AlertableClient>(
     .filter((c) => c.nextContactAt !== null && c.nextContactAt <= today)
     .sort((a, b) => (a.nextContactAt! < b.nextContactAt! ? -1 : 1))
   const stale = active
-    .filter((c) => c.nextContactAt === null && c.lastContactAt !== null && daysBetween(c.lastContactAt, today) > alertDays)
-    .sort((a, b) => (a.lastContactAt! < b.lastContactAt! ? -1 : 1))
+    .map((c) => ({ c, touch: lastTouch(c) }))
+    .filter(({ c, touch }) => c.nextContactAt === null && touch !== null && daysBetween(touch, today) > alertDays)
+    .sort((a, b) => (a.touch! < b.touch! ? -1 : 1))
+    .map(({ c }) => c)
   return { due, stale }
 }

@@ -9,6 +9,7 @@ import type {
   Material,
   Member,
   Movement,
+  OpeningState,
   Project,
   Quote,
   ServiceRatesState,
@@ -114,6 +115,12 @@ export function useMovementHistory(id: string): AuditEntry[] | undefined {
 export function useWorkshopSettings(): SettingsState | undefined {
   const api = useData()
   return useLive<SettingsState>((cb) => api.watchWorkshopSettings(cb), [])
+}
+
+/** Configuración inicial de la billetera (saldos de arranque). */
+export function useOpeningBalances(): OpeningState | undefined {
+  const api = useData()
+  return useLive<OpeningState>((cb) => api.watchOpeningBalances(cb), [])
 }
 
 /** Preferencias propias; `undefined` = cargando, `null` = todavía no tiene. */

@@ -1,11 +1,15 @@
 import { z } from 'zod'
+import { WORKSHOP_SHARE_KEY } from '@/domain/percent'
 import {
   SharesSchema,
+  centsSchema,
   emailKeySchema,
   idSchema,
   isoDateSchema,
   nameSchema,
+  nonNegativeCentsSchema,
   nullableId,
+  nullableIsoDate,
   positiveCentsSchema,
   textSchema,
 } from './common'
@@ -49,12 +53,19 @@ export const MOVEMENT_TYPES = [
   'aporte', // un socio pone dinero
   'transferencia', // entre cajas
   'reintegro', // el taller le devuelve a un socio un gasto que pagó de su bolsillo
+  'reparto', // pasa fondo común del taller a la ganancia de un socio (no mueve cajas)
 ] as const
 export type MovementType = (typeof MOVEMENT_TYPES)[number]
 
 export const MOVEMENT_STATUSES = ['pagado', 'pendiente_pago'] as const
 
 const ProjectSplitSchema = z.object({ projectId: idSchema, amountCents: positiveCentsSchema })
+
+/** Máximo de partes de un reparto entre proyectos (las reglas suman cada una). */
+export const MAX_PROJECT_SPLITS = 20
+
+/** Tipos de movimiento que llevan un socio. */
+export const MEMBER_MOVEMENT_TYPES: readonly MovementType[] = ['retiro', 'aporte', 'reintegro', 'reparto']
 
 /** Campos del movimiento sin las reglas cruzadas (ver MovementDataSchema). */
 export const MovementBaseSchema = z.object({
@@ -81,7 +92,7 @@ export const MovementBaseSchema = z.object({
 export const MovementDataSchema = MovementBaseSchema.superRefine((m, ctx) => {
     const issue = (message: string, path: string) => ctx.addIssue({ code: 'custom', message, path: [path] })
     const isExpense = m.type === 'gasto_proyecto' || m.type === 'gasto_general'
-    const usesMember = m.type === 'retiro' || m.type === 'aporte' || m.type === 'reintegro'
+    const usesMember = MEMBER_MOVEMENT_TYPES.includes(m.type)
 
     if (m.status === 'pendiente_pago' && !isExpense) issue('Solo un gasto puede quedar pendiente de pago', 'status')
     if (m.type !== 'transferencia' && m.toBoxId) issue('Solo una transferencia tiene caja destino', 'toBoxId')
@@ -93,6 +104,7 @@ export const MovementDataSchema = MovementBaseSchema.superRefine((m, ctx) => {
     if (m.status === 'pendiente_pago' && (m.boxId || m.paidBy)) issue('Un gasto pendiente todavía no tiene origen del dinero', 'boxId')
     const splitIds = m.projectSplits.map((p) => p.projectId)
     if (new Set(splitIds).size !== splitIds.length) issue('Un proyecto aparece dos veces en el reparto', 'projectSplits')
+    if (m.projectSplits.length > MAX_PROJECT_SPLITS) issue(`Como máximo ${MAX_PROJECT_SPLITS} proyectos en un reparto`, 'projectSplits')
 
     switch (m.type) {
       case 'cobro':
@@ -123,6 +135,10 @@ export const MovementDataSchema = MovementBaseSchema.superRefine((m, ctx) => {
         if (!m.memberEmail) issue('Elegí el socio', 'memberEmail')
         if (!m.boxId) issue('Elegí la caja', 'boxId')
         break
+      case 'reparto':
+        if (!m.memberEmail) issue('Elegí el socio', 'memberEmail')
+        if (m.boxId) issue('Un reparto del fondo del taller no mueve dinero de las cajas', 'boxId')
+        break
       case 'transferencia':
         if (!m.boxId || !m.toBoxId) issue('Elegí caja de origen y destino', 'toBoxId')
         else if (m.boxId === m.toBoxId) issue('Las cajas deben ser distintas', 'toBoxId')
@@ -141,3 +157,38 @@ export const MovementControlSchema = z.object({
   deletedReason: z.string().max(500).default(''),
 })
 export type MovementControl = z.infer<typeof MovementControlSchema>
+
+// ---- settings/opening: saldos iniciales (al empezar a usar la app) -----------
+
+/** Montos con los que arranca cada socio y el taller (mismas columnas que el panel). */
+export const PersonOpeningSchema = z.object({
+  /** Ganancia (o pérdida) de proyectos anterior. */
+  projects: centsSchema.default(0),
+  /** Gastos generales que ya le tocaron. */
+  general: nonNegativeCentsSchema.default(0),
+  aportes: nonNegativeCentsSchema.default(0),
+  retiros: nonNegativeCentsSchema.default(0),
+  /** Lo que el taller le debe (gastos que pagó de su bolsillo). */
+  debt: centsSchema.default(0),
+})
+export type PersonOpening = z.infer<typeof PersonOpeningSchema>
+
+export const OpeningBalancesSchema = z.object({
+  /** Fecha a la que corresponden los saldos. */
+  date: nullableIsoDate,
+  /** Dinero inicial de cada caja (por id). */
+  boxes: z.record(idSchema, centsSchema).default({}),
+  /** Por socio (email) y "taller". */
+  people: z
+    .record(z.string(), PersonOpeningSchema)
+    .default({})
+    .superRefine((people, ctx) => {
+      for (const key of Object.keys(people)) {
+        if (key !== WORKSHOP_SHARE_KEY && !emailKeySchema.safeParse(key).success) {
+          ctx.addIssue({ code: 'custom', message: `"${key}" no es un socio válido`, path: [key] })
+        }
+      }
+    }),
+  notes: textSchema,
+})
+export type OpeningBalances = z.infer<typeof OpeningBalancesSchema>

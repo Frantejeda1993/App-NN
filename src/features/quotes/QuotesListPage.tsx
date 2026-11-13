@@ -1,5 +1,5 @@
 import { Plus, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, Input } from '@/components/ui/form'
@@ -23,6 +23,8 @@ export function QuotesListPage() {
   const settings = useWorkshopSettings()
   const [group, setGroup] = useState<QuoteGroup>('abiertos')
   const [query, setQuery] = useState('')
+  const busy = useRef(false)
+  const [creating, setCreating] = useState(false)
 
   const projectById = useMemo(() => new Map((projects ?? []).map((p) => [p.id, p])), [projects])
   const clientById = useMemo(() => new Map((clients ?? []).map((c) => [c.id, c])), [clients])
@@ -35,10 +37,15 @@ export function QuotesListPage() {
   })
 
   const create = () => {
-    if (!settings) return
+    // Un doble click / Enter no debe crear dos borradores antes de navegar.
+    if (!settings || busy.current) return
+    busy.current = true
+    setCreating(true)
     try {
       navigate(`/presupuestos/${startQuote(api, me, null, settings.settings)}`)
     } catch (e) {
+      busy.current = false
+      setCreating(false)
       notifyError(e)
     }
   }
@@ -47,7 +54,7 @@ export function QuotesListPage() {
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Presupuestos</h1>
-        <Button onClick={create} disabled={!settings} data-tour="nuevo-presupuesto">
+        <Button onClick={create} disabled={!settings || creating} data-tour="nuevo-presupuesto">
           <Plus /> Nuevo presupuesto
         </Button>
       </div>

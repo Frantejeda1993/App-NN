@@ -25,11 +25,14 @@ import {
   addContact,
   createDocument,
   createMovement,
+  createMovements,
   deleteMovement,
   updateDocument,
   updateMovement,
+  updateWithRev,
   type StoredMovement,
 } from '@/data/repo'
+import { distributionMovements } from '@/domain/distribution'
 import {
   ClientDataSchema,
   GeneralExpenseDataSchema,
@@ -242,9 +245,10 @@ describe('auditoría en documentos comunes', () => {
     const sent = createDocument(db, 'quotes', QuoteDataSchema, { title: 'Enviado', status: 'enviado' }, NACHO)
     await sent.committed
     const base = QuoteDataSchema.parse({ title: 'Enviado', status: 'enviado' })
-    await assertFails(updateDocument(db, 'quotes', sent.id, QuoteDataSchema, { ...base, status: 'borrador' }, NACHO).committed)
-    await assertFails(updateDocument(db, 'quotes', sent.id, QuoteDataSchema, { ...base, version: 5 }, NACHO).committed)
-    await assertSucceeds(updateDocument(db, 'quotes', sent.id, QuoteDataSchema, { ...base, status: 'aceptado' }, NACHO).committed)
+    const upd = (next: typeof base) => updateWithRev(db, NACHO, [{ collectionPath: 'quotes', id: sent.id, schema: QuoteDataSchema, next }]).committed
+    await assertFails(upd({ ...base, status: 'borrador' }))
+    await assertFails(upd({ ...base, version: 5 }))
+    await assertSucceeds(upd({ ...base, status: 'aceptado' }))
   })
 
   it('lo comprado de la lista de compras debe ser una lista acotada', async () => {
@@ -270,7 +274,7 @@ describe('proyectos', () => {
     await assertSucceeds(p.committed)
 
     const next = ProjectDataSchema.parse({ ...base, status: 'en_proceso', shares: { [NACHO]: 5000, [NAHUEL]: 5000, taller: 0 } })
-    await assertSucceeds(updateDocument(dbAs(NAHUEL), 'projects', p.id, ProjectDataSchema, next, NAHUEL).committed)
+    await assertSucceeds(updateWithRev(dbAs(NAHUEL), NAHUEL, [{ collectionPath: 'projects', id: p.id, schema: ProjectDataSchema, next }]).committed)
     const saved = (await getDoc(doc(db, 'projects', p.id))).data()
     expect(saved).toMatchObject({ status: 'en_proceso', shares: { [NACHO]: 5000, [NAHUEL]: 5000, taller: 0 }, createdBy: NACHO })
   })
@@ -538,5 +542,121 @@ describe('movimientos', () => {
       entity: 'movements', entityId: 'm2', version: 1, action: 'create', before: null, after: {}, by: NACHO, at: serverTimestamp(),
     })
     await assertFails(batch.commit())
+  })
+})
+
+/**
+ * Escribe un movimiento "a mano" (salteando zod, como haría alguien con la
+ * consola o el SDK) con su auditLog correcto: así lo único que decide son las
+ * reglas de datos del movimiento.
+ */
+function rawMovement(db: Firestore, id: string, data: Record<string, unknown>) {
+  const full = {
+    type: 'cobro', status: 'pagado', amountCents: 10000, date: '2026-11-07', boxId: 'b1', toBoxId: null, paidBy: null,
+    memberEmail: null, projectId: 'p1', projectSplits: [], generalExpenseId: null, category: '', description: '',
+    version: 1, deleted: false, deletedReason: '', ...data,
+  }
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'movements', id), { ...full, ...stamp(NACHO) })
+  batch.set(doc(db, 'auditLog', `${id}_v1`), {
+    entity: 'movements', entityId: id, version: 1, action: 'create', before: null, after: full, by: NACHO, at: serverTimestamp(),
+  })
+  return batch.commit()
+}
+
+describe('movimientos: reglas cruzadas (revisión de seguridad)', () => {
+  it('un movimiento bien formado escrito a mano pasa (control)', async () => {
+    await assertSucceeds(rawMovement(dbAs(NACHO), 'ok1', {}))
+  })
+
+  it('un cobro con reparto entre proyectos se rechaza (inflaría la ganancia de otro proyecto)', async () => {
+    await assertFails(rawMovement(dbAs(NACHO), 'x1', { projectSplits: [{ projectId: 'p2', amountCents: 9_999_999 }] }))
+  })
+
+  it('las partes del reparto de un gasto deben sumar el total', async () => {
+    const gasto = { type: 'gasto_proyecto', projectId: null }
+    const db = dbAs(NACHO)
+    await assertFails(rawMovement(db, 'x2', { ...gasto, projectSplits: [{ projectId: 'p1', amountCents: 3000 }, { projectId: 'p2', amountCents: 3000 }] }))
+    await assertSucceeds(rawMovement(db, 'x3', { ...gasto, projectSplits: [{ projectId: 'p1', amountCents: 4000 }, { projectId: 'p2', amountCents: 6000 }] }))
+    await assertFails(rawMovement(db, 'x4', { ...gasto, projectId: 'p1', projectSplits: [{ projectId: 'p1', amountCents: 10000 }] }))
+  })
+
+  it('campos que no corresponden al tipo se rechazan', async () => {
+    const db = dbAs(NACHO)
+    await assertFails(rawMovement(db, 'x5', { type: 'retiro', projectId: 'p1', memberEmail: NACHO }))
+    await assertFails(rawMovement(db, 'x6', { generalExpenseId: 'g1' }))
+    await assertFails(rawMovement(db, 'x7', { type: 'gasto_proyecto', status: 'pendiente_pago', boxId: 'b1' }))
+  })
+
+  it('la fecha debe existir con formato AAAA-MM-DD', async () => {
+    const db = dbAs(NACHO)
+    await assertFails(rawMovement(db, 'x8', { date: '9999-99-99' }))
+    await assertFails(rawMovement(db, 'x9', { date: '2026-13-01' }))
+  })
+
+  it('no se asigna un retiro a un socio desactivado', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'members/baja@gmail.com'), { name: 'Baja', active: false })
+    })
+    await assertFails(rawMovement(dbAs(NACHO), 'x10', { type: 'retiro', projectId: null, memberEmail: 'baja@gmail.com' }))
+  })
+
+  it('una baja lógica sin motivo se rechaza', async () => {
+    const db = dbAs(NACHO)
+    const { id, committed } = createMovement(db, cobro, NACHO)
+    await committed
+    const current = await loadMovement(db, id)
+    expect(() => deleteMovement(db, current, '   ', NACHO)).toThrow(/motivo/)
+  })
+})
+
+describe('reparto del fondo del taller', () => {
+  it('se registra un movimiento por socio, sin caja, en un solo lote', async () => {
+    const db = dbAs(NACHO)
+    const res = createMovements(db, distributionMovements({ date: '2026-11-07', description: 'Octubre', shares: { [NACHO]: 5000, [NAHUEL]: 5000 } }), NACHO)
+    await assertSucceeds(res.committed)
+    const list = await getDocs(query(collection(db, 'movements'), where('type', '==', 'reparto')))
+    expect(list.size).toBe(2)
+  })
+
+  it('un reparto que mueve una caja se rechaza', async () => {
+    await assertFails(rawMovement(dbAs(NACHO), 'r1', { type: 'reparto', projectId: null, memberEmail: NACHO, boxId: 'b1' }))
+    await assertSucceeds(rawMovement(dbAs(NACHO), 'r2', { type: 'reparto', projectId: null, memberEmail: NACHO, boxId: null }))
+  })
+})
+
+describe('concurrencia optimista (rev) en presupuestos y proyectos', () => {
+  it('dos guardados sobre la misma versión: el segundo se rechaza', async () => {
+    const db = dbAs(NACHO)
+    const q = createDocument(db, 'quotes', QuoteDataSchema, { title: 'Cocina' }, NACHO)
+    await q.committed
+    const base = QuoteDataSchema.parse({ title: 'Cocina' })
+    await assertSucceeds(updateWithRev(db, NACHO, [{ collectionPath: 'quotes', id: q.id, schema: QuoteDataSchema, next: { ...base, notes: 'A' } }]).committed)
+    await assertFails(updateWithRev(dbAs(NAHUEL), NAHUEL, [{ collectionPath: 'quotes', id: q.id, schema: QuoteDataSchema, next: { ...base, notes: 'B' } }]).committed)
+  })
+
+  it('un update directo sin subir rev se rechaza', async () => {
+    const db = dbAs(NACHO)
+    const p = createDocument(db, 'projects', ProjectDataSchema, { title: 'Cocina', clientId: 'c1', shares: { [NACHO]: 10000 } }, NACHO)
+    await p.committed
+    const next = ProjectDataSchema.parse({ title: 'Cocina 2', clientId: 'c1', shares: { [NACHO]: 10000 } })
+    await assertFails(updateDocument(db, 'projects', p.id, ProjectDataSchema, next, NACHO).committed)
+  })
+})
+
+describe('otros endurecimientos', () => {
+  it('el historial de contactos no se borra', async () => {
+    const db = dbAs(NACHO)
+    const c = createDocument(db, 'clients', ClientDataSchema, { name: 'Ana' }, NACHO)
+    await c.committed
+    const k = addContact(db, { id: c.id, lastContactAt: null }, { date: '2026-11-07', channel: 'whatsapp' }, null, NACHO)
+    await k.committed
+    await assertFails(deleteDoc(doc(db, 'clients', c.id, 'contacts', k.id)))
+  })
+
+  it('la configuración inicial se guarda en settings/opening con mapas acotados', async () => {
+    const db = dbAs(NACHO)
+    await assertSucceeds(setDoc(doc(db, 'settings/opening'), { date: '2026-01-01', boxes: { b1: 5000 }, people: {}, notes: '', ...stamp(NACHO) }))
+    await assertFails(setDoc(doc(dbAs(NAHUEL), 'settings/opening'), { date: null, boxes: 'x', people: {}, notes: '', updatedBy: NAHUEL, updatedAt: serverTimestamp(), createdBy: NACHO }))
   })
 })

@@ -5,12 +5,22 @@
  * - Ganancia de un proyecto = cobros − gastos pagados − gastos pendientes de pago.
  * - Ganancias Y pérdidas se reparten según la participación del proyecto.
  * - Cada gasto general se reparte según el reparto de ese gasto.
- * - Lo que le corresponde a cada uno = parte de proyectos − parte de gastos
- *   generales + aportes − retiros + lo que el taller le debe.
+ * - Lo que le corresponde a cada uno = saldo inicial + parte de proyectos − parte
+ *   de gastos generales + aportes − retiros + lo que el taller le debe + lo que
+ *   recibió del fondo del taller (reparto; al taller le resta).
  * - Control: la suma de todos = dinero en cajas − gastos pendientes de pago.
  */
 import { WORKSHOP_SHARE_KEY, allocateByWeights, type Shares } from './percent'
 import { memberDebts, projectAmount, type WalletMovement } from './wallet'
+
+/** Saldo inicial de una persona (ver configuración inicial de la billetera). */
+export interface OpeningLike {
+  projects: number
+  general: number
+  aportes: number
+  retiros: number
+  debt: number
+}
 
 export interface DashboardInput {
   /** Emails de los socios (aparecen aunque estén en 0). */
@@ -19,6 +29,8 @@ export interface DashboardInput {
   generalExpenses: { id: string; shares: Shares }[]
   movements: WalletMovement[]
   quotes: QuoteLike[]
+  /** Saldos iniciales por socio (email) y "taller". */
+  opening?: Record<string, OpeningLike>
 }
 
 export interface QuoteLike {
@@ -36,6 +48,8 @@ export interface Allocation {
   aportes: number
   retiros: number
   debt: number
+  /** Recibido del fondo del taller (+ socio, − taller). */
+  reparto: number
   total: number
 }
 
@@ -70,11 +84,22 @@ function referencedProjects(movements: WalletMovement[]): Set<string> {
   return ids
 }
 
+const emptyAllocation = (): Allocation => ({ projects: 0, general: 0, aportes: 0, retiros: 0, debt: 0, reparto: 0, total: 0 })
+
 export function allocations(input: DashboardInput): Record<string, Allocation> {
   const out: Record<string, Allocation> = {}
-  const get = (k: string) => (out[k] ??= { projects: 0, general: 0, aportes: 0, retiros: 0, debt: 0, total: 0 })
+  const get = (k: string) => (out[k] ??= emptyAllocation())
   for (const m of input.members) get(m)
   get(WORKSHOP_SHARE_KEY)
+
+  const opening = input.opening ?? {}
+  for (const [k, o] of Object.entries(opening)) {
+    const a = get(k)
+    a.projects += o.projects
+    a.general += o.general
+    a.aportes += o.aportes
+    a.retiros += o.retiros
+  }
 
   const known = new Map(input.projects.map((p) => [p.id, p.shares]))
   for (const id of new Set([...known.keys(), ...referencedProjects(input.movements)])) {
@@ -91,12 +116,22 @@ export function allocations(input: DashboardInput): Record<string, Allocation> {
       for (const [k, v] of Object.entries(split(m.amountCents, shares))) get(k).general += v
     } else if (m.type === 'aporte' && m.memberEmail) get(m.memberEmail).aportes += m.amountCents
     else if (m.type === 'retiro' && m.memberEmail) get(m.memberEmail).retiros += m.amountCents
+    else if (m.type === 'reparto' && m.memberEmail) {
+      get(m.memberEmail).reparto += m.amountCents
+      get(WORKSHOP_SHARE_KEY).reparto -= m.amountCents
+    }
   }
 
-  for (const [k, v] of Object.entries(memberDebts(input.movements))) get(k).debt += v
+  const openingDebts = Object.fromEntries(Object.entries(opening).map(([k, o]) => [k, o.debt]))
+  for (const [k, v] of Object.entries(memberDebts(input.movements, openingDebts))) get(k).debt += v
 
-  for (const a of Object.values(out)) a.total = a.projects - a.general + a.aportes - a.retiros + a.debt
+  for (const a of Object.values(out)) a.total = a.projects - a.general + a.aportes - a.retiros + a.debt + a.reparto
   return out
+}
+
+/** Fondo común del taller disponible para repartir (lo que le corresponde al taller, nunca < 0). */
+export function workshopFund(alloc: Record<string, Allocation>): number {
+  return Math.max(0, alloc[WORKSHOP_SHARE_KEY]?.total ?? 0)
 }
 
 /** Gastos (de proyecto o generales) registrados pero todavía no pagados. */
@@ -107,6 +142,8 @@ export function pendingExpenses(movements: WalletMovement[]): number {
 }
 
 const ACCEPTED = new Set(['aceptado', 'aceptado_parcial', 'finalizado'])
+/** Una versión nueva solo reemplaza a la anterior cuando está vigente (enviada o aceptada). */
+const SUPERSEDING = new Set([...ACCEPTED, 'enviado'])
 
 function collectedByProject(movements: WalletMovement[]): Map<string, number> {
   const out = new Map<string, number>()
@@ -122,15 +159,22 @@ const acceptedAmount = (q: QuoteLike) =>
 
 /**
  * Presupuestos vigentes agrupados por proyecto. Una versión reemplazada (otra
- * la tiene como `parentQuoteId`) no cuenta, para no sumar v1 + v2.
+ * vigente la tiene como `parentQuoteId`) no cuenta, para no sumar v1 + v2. Un
+ * borrador, rechazado o archivado nuevo NO reemplaza al aceptado anterior.
  */
-function quotesByProject(quotes: QuoteLike[]): Map<string | null, { accepted: number; sent: number; hasAccepted: boolean }> {
-  const superseded = new Set(quotes.map((q) => q.parentQuoteId).filter((id): id is string => !!id))
+function quotesByProject(
+  quotes: QuoteLike[],
+  keptAccepted: Set<string>,
+): Map<string | null, { accepted: number; sent: number; hasAccepted: boolean }> {
+  const superseded = new Set(
+    quotes.filter((q) => q.parentQuoteId && SUPERSEDING.has(q.status)).map((q) => q.parentQuoteId as string),
+  )
   const out = new Map<string | null, { accepted: number; sent: number; hasAccepted: boolean }>()
   for (const q of quotes) {
     if (superseded.has(q.id)) continue
     const row = out.get(q.projectId) ?? { accepted: 0, sent: 0, hasAccepted: false }
-    if (ACCEPTED.has(q.status)) {
+    // Un finalizado que se archivó sigue siendo el aceptado del proyecto (keptAccepted).
+    if (ACCEPTED.has(q.status) || keptAccepted.has(q.id)) {
       row.accepted += acceptedAmount(q)
       row.hasAccepted = true
     } else if (q.status === 'enviado') row.sent += q.totals.totalCents
@@ -145,16 +189,18 @@ function quotesByProject(quotes: QuoteLike[]): Map<string | null, { accepted: nu
  * - enviados: presupuestos enviados sin respuesta, solo de proyectos que todavía no tienen uno aceptado.
  * `excludeProjectIds`: proyectos cancelados/archivados (no se espera cobrarlos).
  * Un presupuesto aceptado sin proyecto no se cuenta (no hay dónde registrar el cobro).
+ * `keptAccepted`: ids que los proyectos tienen como aceptados (cuenta aunque estén archivados).
  */
 export function futureIncome(
   quotes: QuoteLike[],
   movements: WalletMovement[],
   excludeProjectIds: Set<string> = new Set(),
+  keptAccepted: Set<string> = new Set(),
 ): { acceptedCents: number; sentCents: number } {
   const collected = collectedByProject(movements)
   let acceptedCents = 0
   let sentCents = 0
-  for (const [pid, row] of quotesByProject(quotes)) {
+  for (const [pid, row] of quotesByProject(quotes, keptAccepted)) {
     if (pid && excludeProjectIds.has(pid)) continue
     if (row.hasAccepted && pid) acceptedCents += Math.max(0, row.accepted - (collected.get(pid) ?? 0))
     else if (!row.hasAccepted) sentCents += row.sent
@@ -173,9 +219,17 @@ export interface CollectionRow {
   accepted: boolean
 }
 
-export function projectCollection(projects: { id: string }[], quotes: QuoteLike[], movements: WalletMovement[]): CollectionRow[] {
+/** Presupuestos que los proyectos tienen como aceptados. */
+export const keptAcceptedIds = (projects: { acceptedQuoteId?: string | null }[]) =>
+  new Set(projects.map((p) => p.acceptedQuoteId).filter((id): id is string => !!id))
+
+export function projectCollection(
+  projects: { id: string; acceptedQuoteId?: string | null }[],
+  quotes: QuoteLike[],
+  movements: WalletMovement[],
+): CollectionRow[] {
   const collected = collectedByProject(movements)
-  const byProject = quotesByProject(quotes)
+  const byProject = quotesByProject(quotes, keptAcceptedIds(projects))
   return projects.map((p) => {
     const row = byProject.get(p.id)
     const budgetCents = row ? (row.hasAccepted ? row.accepted : row.sent) : 0

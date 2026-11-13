@@ -71,9 +71,10 @@ describe('quotePdfModel', () => {
     const m = model()
     // 300 + 250 + 100 − 50 = 600
     expect(m.totals).toContainEqual({ label: 'Total', amount: '600,00 €', strong: true })
-    expect(m.totals).toContainEqual({ label: 'Seña (50 %)', amount: '300,00 €' })
-    // aceptado: 300 + 100 − 50 = 350
-    expect(m.totals).toContainEqual({ label: 'Total aceptado', amount: '350,00 €', strong: true })
+    // aceptado: 300 + 100 = 400 de 650 → ajustes −50 × 400/650 = −30,77 → 369,23
+    expect(m.totals).toContainEqual({ label: 'Total aceptado', amount: '369,23 €', strong: true })
+    // La seña es sobre lo aceptado: 50 % de 369,23
+    expect(m.totals).toContainEqual({ label: 'Seña (50 %)', amount: '184,62 €' })
     expect(m.terms).toBe('50 % al aceptar')
     expect(m.notes).toBe('No incluye electrodomésticos')
   })

@@ -6,6 +6,7 @@ import {
   nonNegativeCentsSchema,
   nullableId,
   nullableIsoDate,
+  revSchema,
   textSchema,
   isoDateSchema,
 } from './common'
@@ -99,5 +100,7 @@ export const ProjectDataSchema = z.object({
   acceptedQuoteId: nullableId,
   /** Gastos estimados del proyecto (para comparar con los reales). */
   estimatedCostCents: nonNegativeCentsSchema.nullable().default(null),
+  /** Contador de escrituras: las reglas exigen +1 (si otro socio guardó antes, se rechaza). */
+  rev: revSchema,
 })
 export type ProjectData = z.infer<typeof ProjectDataSchema>

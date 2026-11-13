@@ -25,4 +25,4 @@ export const COLLECTIONS = {
 } as const
 
 /** Documentos de settings/. */
-export const SETTINGS_DOCS = { workshop: 'workshop', services: 'services' } as const
+export const SETTINGS_DOCS = { workshop: 'workshop', services: 'services', opening: 'opening' } as const

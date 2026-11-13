@@ -29,7 +29,10 @@ import {
   type WorkshopSettings,
   UserPrefsSchema,
   type UserPrefs,
+  OpeningBalancesSchema,
+  type OpeningBalances,
 } from '@/model'
+import { distributionMovements } from '@/domain/distribution'
 import {
   byCreatedDesc,
   byDateDesc,
@@ -42,6 +45,7 @@ import {
   type Movement,
   type Contact,
   type DataApi,
+  type DistributionInput,
   type Member,
   type Project,
   type Quote,
@@ -102,6 +106,13 @@ export class FakeDataApi implements DataApi {
     const committed = err ? Promise.reject(err) : Promise.resolve()
     committed.catch(() => {})
     this.emit()
+    return { id, committed }
+  }
+
+  /** Escritura que el servidor rechazaría (como las reglas de Firestore: asíncrono). */
+  private denied(id: string, message = 'conflicto'): WriteResult {
+    const committed = Promise.reject(Object.assign(new Error(message), { code: 'permission-denied' }))
+    committed.catch(() => {})
     return { id, committed }
   }
 
@@ -182,10 +193,12 @@ export class FakeDataApi implements DataApi {
     return this.done(id)
   }
 
+  /** Como las reglas: el `rev` que se envía debe ser el actual (si no, otro socio guardó antes). */
   updateProject(id: string, next: ProjectData, by: string) {
     const prev = this.projects.get(id)
-    if (!prev) throw new Error('no existe')
-    this.projects.set(id, { ...ProjectDataSchema.parse(next), ...this.stamp(by, prev), id })
+    const data = ProjectDataSchema.parse(next)
+    if (!prev || prev.rev !== data.rev) return this.denied(id)
+    this.projects.set(id, { ...data, rev: data.rev + 1, ...this.stamp(by, prev), id })
     return this.done(id)
   }
 
@@ -221,7 +234,8 @@ export class FakeDataApi implements DataApi {
   }
 
   updateBox(id: string, next: BoxData, by: string) {
-    const prev = this.boxes.get(id)!
+    const prev = this.boxes.get(id)
+    if (!prev) return this.denied(id, 'no existe')
     this.boxes.set(id, { ...BoxDataSchema.parse(next), ...this.stamp(by, prev), id })
     return this.done(id)
   }
@@ -237,7 +251,7 @@ export class FakeDataApi implements DataApi {
   }
 
   watchQuotes(cb: (q: Quote[]) => void) {
-    return this.watch(() => cb([...this.quotes.values()]))
+    return this.watch(() => cb([...this.quotes.values()].sort(byCreatedDesc)))
   }
 
   watchQuote(id: string, cb: (q: Quote | null) => void) {
@@ -250,13 +264,29 @@ export class FakeDataApi implements DataApi {
     return this.done(id)
   }
 
-  updateQuote(id: string, next: QuoteData, by: string) {
-    const prev = this.quotes.get(id)!
-    this.quotes.set(id, { ...QuoteDataSchema.parse(next), ...this.stamp(by, prev), id })
+  /**
+   * Como las reglas: rev actual, no vuelve a borrador, no cambia el número de
+   * versión; el proyecto (si viene) se escribe en el mismo lote (todo o nada).
+   */
+  updateQuote(id: string, next: QuoteData, by: string, project?: { id: string; next: ProjectData }) {
+    const prev = this.quotes.get(id)
+    const data = QuoteDataSchema.parse(next)
+    if (!prev || prev.rev !== data.rev) return this.denied(id)
+    if (data.status === 'borrador' && prev.status !== 'borrador') return this.denied(id, 'no puede volver a borrador')
+    if (data.version !== prev.version) return this.denied(id, 'no puede cambiar la versión')
+    const prevProject = project ? this.projects.get(project.id) : undefined
+    const projectData = project ? ProjectDataSchema.parse(project.next) : undefined
+    if (project && (!prevProject || prevProject.rev !== projectData!.rev)) return this.denied(id)
+    this.quotes.set(id, { ...data, rev: data.rev + 1, ...this.stamp(by, prev), id })
+    if (project && prevProject && projectData) {
+      this.projects.set(project.id, { ...projectData, rev: projectData.rev + 1, ...this.stamp(by, prevProject), id: project.id })
+    }
     return this.done(id)
   }
 
+  /** Como las reglas: solo se borran borradores. */
   deleteQuote(id: string) {
+    if (this.quotes.get(id)?.status !== 'borrador') return this.denied(id, 'solo se borran borradores')
     this.quotes.delete(id)
     return this.done(id)
   }
@@ -282,7 +312,8 @@ export class FakeDataApi implements DataApi {
   }
 
   updateGeneralExpense(id: string, next: GeneralExpenseData, by: string) {
-    const prev = this.generalExpenses.get(id)!
+    const prev = this.generalExpenses.get(id)
+    if (!prev) return this.denied(id, 'no existe')
     this.generalExpenses.set(id, { ...GeneralExpenseDataSchema.parse(next), ...this.stamp(by, prev), id })
     return this.done(id)
   }
@@ -295,12 +326,23 @@ export class FakeDataApi implements DataApi {
     return this.watch(() => cb([...(this.history.get(id) ?? [])]))
   }
 
-  createMovement(input: unknown, by: string) {
-    const data = MovementDataSchema.parse(input)
+  private addMovement(data: MovementData, by: string): string {
     const id = `m${++this.seq}`
     this.movements.set(id, { ...data, version: 1, deleted: false, deletedReason: '', ...this.stamp(by), id })
     this.history.set(id, [{ id: `${id}_v1`, version: 1, action: 'create', before: null, after: { ...data }, by, at: new Date() }])
-    return this.done(id)
+    return id
+  }
+
+  createMovement(input: unknown, by: string) {
+    return this.done(this.addMovement(MovementDataSchema.parse(input), by))
+  }
+
+  /** Todos o ninguno, como el lote real. */
+  createDistribution(input: DistributionInput, by: string) {
+    const parsed = distributionMovements(input).map((m) => MovementDataSchema.parse(m))
+    if (parsed.length === 0) throw new Error('No hay movimientos para registrar')
+    const ids = parsed.map((data) => this.addMovement(data, by))
+    return this.done(ids[0])
   }
 
   /** Simula las reglas: si la versión que el usuario veía ya no es la actual, se rechaza. */
@@ -319,13 +361,18 @@ export class FakeDataApi implements DataApi {
     return this.done(current.id)
   }
 
+  // Como repo.ts: un movimiento ya eliminado o una baja sin motivo fallan en el acto (no asíncrono).
   updateMovement(current: Movement, next: MovementData, by: string) {
+    if (current.deleted) throw new Error('No se puede editar un movimiento eliminado')
     const data = MovementDataSchema.parse(next)
     return this.writeVersion(current, { ...current, ...data, version: current.version + 1 }, 'update', by)
   }
 
   deleteMovement(current: Movement, reason: string, by: string) {
-    return this.writeVersion(current, { ...current, deleted: true, deletedReason: reason, version: current.version + 1 }, 'delete', by)
+    if (current.deleted) throw new Error('El movimiento ya está eliminado')
+    const deletedReason = reason.trim().slice(0, 500)
+    if (!deletedReason) throw new Error('Escribí el motivo de la baja')
+    return this.writeVersion(current, { ...current, deleted: true, deletedReason, version: current.version + 1 }, 'delete', by)
   }
 
   // ---- catálogo y plantillas ----
@@ -401,5 +448,19 @@ export class FakeDataApi implements DataApi {
     this.settings = WorkshopSettingsSchema.parse(next)
     this.settingsExists = true
     return this.done('workshop')
+  }
+
+  // ---- configuración inicial de la billetera ----
+  opening: OpeningBalances = OpeningBalancesSchema.parse({})
+  openingExists = false
+
+  watchOpeningBalances(cb: (s: { opening: OpeningBalances; exists: boolean }) => void) {
+    return this.watch(() => cb({ opening: this.opening, exists: this.openingExists }))
+  }
+
+  saveOpeningBalances(next: OpeningBalances) {
+    this.opening = OpeningBalancesSchema.parse(next)
+    this.openingExists = true
+    return this.done('opening')
   }
 }

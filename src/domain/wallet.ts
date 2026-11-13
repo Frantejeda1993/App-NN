@@ -4,7 +4,7 @@
  */
 
 export interface WalletMovement {
-  type: 'cobro' | 'gasto_proyecto' | 'gasto_general' | 'retiro' | 'aporte' | 'transferencia' | 'reintegro'
+  type: 'cobro' | 'gasto_proyecto' | 'gasto_general' | 'retiro' | 'aporte' | 'transferencia' | 'reintegro' | 'reparto'
   status: 'pagado' | 'pendiente_pago'
   amountCents: number
   date: string
@@ -24,7 +24,7 @@ const isExpense = (m: WalletMovement) => m.type === 'gasto_proyecto' || m.type =
 
 /** Cuánto cambia el saldo de `boxId` por este movimiento. */
 export function boxDelta(m: WalletMovement, boxId: string): number {
-  if (m.deleted || m.status !== 'pagado') return 0
+  if (m.deleted || m.status !== 'pagado' || m.type === 'reparto') return 0
   if (m.type === 'transferencia') {
     if (m.boxId === boxId) return -m.amountCents
     if (m.toBoxId === boxId) return m.amountCents
@@ -36,32 +36,38 @@ export function boxDelta(m: WalletMovement, boxId: string): number {
 
 /**
  * Efecto sobre el dinero total del taller (todas las cajas): + entra, − sale,
- * 0 transferencias. Un gasto pagado del bolsillo de un socio no sale de las
- * cajas (queda como deuda con el socio).
+ * 0 transferencias y repartos. Un gasto pagado del bolsillo de un socio no sale
+ * de las cajas (queda como deuda con el socio).
  */
 export function netEffect(m: WalletMovement): number {
-  if (m.deleted || m.status !== 'pagado' || m.type === 'transferencia') return 0
+  if (m.deleted || m.status !== 'pagado' || m.type === 'transferencia' || m.type === 'reparto') return 0
   if (isExpense(m) && m.boxId === null) return 0
   return m.type === 'cobro' || m.type === 'aporte' ? m.amountCents : -m.amountCents
 }
 
 /** Signo para mostrar en listas: + ingreso, − egreso, 0 neutro. */
 export function displaySign(m: WalletMovement): 1 | -1 | 0 {
-  if (m.type === 'transferencia') return 0
+  if (m.type === 'transferencia' || m.type === 'reparto') return 0
   return m.type === 'cobro' || m.type === 'aporte' ? 1 : -1
 }
 
-export function boxBalances(movements: WalletMovement[], boxIds: string[]): Record<string, number> {
-  const out: Record<string, number> = Object.fromEntries(boxIds.map((id) => [id, 0]))
-  for (const m of movements) {
-    for (const id of boxIds) out[id] += boxDelta(m, id)
-  }
-  return out
+/** Saldo de cada caja: saldo inicial (configuración inicial) + movimientos. */
+export function boxBalances(
+  movements: WalletMovement[],
+  boxIds: string[],
+  opening: Record<string, number> = {},
+): Record<string, number> {
+  return Object.fromEntries(
+    boxIds.map((id) => [id, movements.reduce((s, m) => s + boxDelta(m, id), opening[id] ?? 0)]),
+  )
 }
 
-/** Lo que el taller le debe a cada socio (gastos que pagó de su bolsillo − reintegros). */
-export function memberDebts(movements: WalletMovement[]): Record<string, number> {
-  const out: Record<string, number> = {}
+/**
+ * Lo que el taller le debe a cada socio: deuda inicial + gastos que pagó de su
+ * bolsillo − reintegros.
+ */
+export function memberDebts(movements: WalletMovement[], opening: Record<string, number> = {}): Record<string, number> {
+  const out: Record<string, number> = { ...opening }
   for (const m of movements) {
     if (m.deleted) continue
     if (isExpense(m) && m.status === 'pagado' && m.paidBy) out[m.paidBy] = (out[m.paidBy] ?? 0) + m.amountCents
@@ -72,9 +78,11 @@ export function memberDebts(movements: WalletMovement[]): Record<string, number>
 
 /** Parte de un movimiento que corresponde a un proyecto (completo o su parte del reparto). */
 export function projectAmount(m: WalletMovement, projectId: string): number {
-  // Si hay reparto, manda el reparto (evita contar dos veces un dato viejo con ambos).
-  if (m.projectSplits.length > 0) return m.projectSplits.find((s) => s.projectId === projectId)?.amountCents ?? 0
-  return m.projectId === projectId ? m.amountCents : 0
+  // Solo un gasto de proyecto se reparte; en cualquier otro tipo el reparto se ignora.
+  if (m.type === 'gasto_proyecto' && m.projectSplits.length > 0) {
+    return m.projectSplits.find((s) => s.projectId === projectId)?.amountCents ?? 0
+  }
+  return (m.type === 'cobro' || m.type === 'gasto_proyecto') && m.projectId === projectId ? m.amountCents : 0
 }
 
 export function touchesProject(m: WalletMovement, projectId: string): boolean {

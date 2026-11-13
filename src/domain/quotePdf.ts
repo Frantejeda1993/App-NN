@@ -86,11 +86,15 @@ export function quotePdfModel({
   }
 
   const out: PdfTotal[] = []
-  if (totals.adjustmentsCents !== 0) {
-    out.push({ label: 'Subtotal', amount: eur(totals.itemsCents + totals.freeLinesCents) })
-    out.push({ label: totals.adjustmentsCents < 0 ? 'Descuento' : 'Ajustes', amount: eur(totals.adjustmentsCents) })
+  const hasAdjust = totals.adjustmentsCents !== 0
+  const hasVat = totals.vatCents !== 0
+  // Con ajustes o IVA el cliente tiene que ver de qué importe se parte.
+  if (hasAdjust || hasVat) out.push({ label: 'Subtotal', amount: eur(totals.itemsCents + totals.freeLinesCents) })
+  if (hasAdjust) out.push({ label: totals.adjustmentsCents < 0 ? 'Descuento' : 'Ajustes', amount: eur(totals.adjustmentsCents) })
+  if (hasVat) {
+    if (hasAdjust) out.push({ label: 'Base imponible', amount: eur(totals.subtotalCents) })
+    out.push({ label: 'IVA', amount: eur(totals.vatCents) })
   }
-  if (totals.vatCents !== 0) out.push({ label: 'IVA', amount: eur(totals.vatCents) })
   out.push({ label: 'Total', amount: eur(totals.totalCents), strong: true })
   if (quote.depositBp > 0) out.push({ label: `Seña (${formatPercent(quote.depositBp)})`, amount: eur(totals.depositCents) })
   if (showExcluded) out.push({ label: 'Total aceptado', amount: eur(totals.acceptedTotalCents), strong: true })

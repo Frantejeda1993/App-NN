@@ -18,7 +18,10 @@ function hasWebGL(): boolean {
   if (webgl !== null) return webgl
   try {
     const c = document.createElement('canvas')
-    webgl = typeof WebGLRenderingContext !== 'undefined' && !!(c.getContext('webgl2') ?? c.getContext('webgl'))
+    const ctx = typeof WebGLRenderingContext !== 'undefined' ? (c.getContext('webgl2') ?? c.getContext('webgl')) : null
+    webgl = !!ctx
+    // Liberar el contexto de prueba: los navegadores limitan cuántos hay vivos.
+    ctx?.getExtension('WEBGL_lose_context')?.loseContext()
   } catch {
     webgl = false
   }
@@ -51,14 +54,18 @@ export function Furniture3DView({
   const hasDoors = items.some((i) => i.item.doors.count > 0 || i.item.drawers.count > 0)
 
   return (
-    <div className={cn('relative h-80 w-full overflow-hidden rounded-lg border border-border bg-muted/40', className)} aria-label="Vista 3D" role="img">
-      {!hasWebGL() ? (
-        <p className="grid h-full place-items-center p-4 text-center text-sm text-muted-foreground">Este navegador no puede mostrar la vista 3D.</p>
-      ) : (
-        <Suspense fallback={<p className="grid h-full place-items-center text-sm text-muted-foreground">Cargando 3D…</p>}>
-          <Furniture3D items={scene} />
-        </Suspense>
-      )}
+    <div className={cn('relative h-80 w-full overflow-hidden rounded-lg border border-border bg-muted/40', className)}>
+      {/* role="img" solo envuelve el dibujo (o su aviso): el botón de puertas,
+          que va afuera, sigue siendo accesible para lectores de pantalla. */}
+      <div role="img" aria-label="Vista 3D" className="h-full w-full">
+        {!hasWebGL() ? (
+          <p className="grid h-full place-items-center p-4 text-center text-sm text-muted-foreground">Este navegador no puede mostrar la vista 3D.</p>
+        ) : (
+          <Suspense fallback={<p className="grid h-full place-items-center text-sm text-muted-foreground">Cargando 3D…</p>}>
+            <Furniture3D items={scene} />
+          </Suspense>
+        )}
+      </div>
       {hasDoors && hasWebGL() && (
         <Button size="sm" variant="outline" className="absolute right-2 top-2 bg-card/90" aria-pressed={open} onClick={() => setOpen(!open)}>
           {open ? <DoorClosed /> : <DoorOpen />} {open ? 'Cerrar puertas' : 'Abrir puertas'}

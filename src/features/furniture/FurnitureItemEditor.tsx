@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import type { EdgeBanding, Hardware, Material } from '@/data/api'
@@ -232,17 +232,43 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/**
+ * Número del mueble. Mientras se escribe se muestra lo tecleado: si queda vacío o
+ * no es un número, se avisa y NO se cambia el valor (antes se guardaba un 0 sin
+ * avisar). Al salir del campo vuelve a mostrar el valor guardado.
+ */
 function NumInput({ id, value, onChange, decimal }: { id: string; value: number; onChange: (n: number) => void; decimal?: boolean }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const shown = Number.isFinite(value) ? String(value) : ''
+  const parsed = draft === null || draft.trim() === '' ? Number.NaN : Number(draft)
+  const invalid = draft !== null && !Number.isFinite(parsed)
+  const errorId = `${id}-invalid`
   return (
-    <Input
-      id={id}
-      type="number"
-      inputMode={decimal ? 'decimal' : 'numeric'}
-      min={0}
-      step={decimal ? '0.1' : '1'}
-      value={Number.isFinite(value) ? value : ''}
-      onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-    />
+    <div className="flex flex-col gap-1">
+      <Input
+        id={id}
+        type="number"
+        inputMode={decimal ? 'decimal' : 'numeric'}
+        min={0}
+        step={decimal ? '0.1' : '1'}
+        value={draft ?? shown}
+        aria-invalid={invalid || undefined}
+        aria-describedby={invalid ? errorId : undefined}
+        onFocus={() => setDraft(shown)}
+        onBlur={() => setDraft(null)}
+        onChange={(e) => {
+          const raw = e.target.value
+          setDraft(raw)
+          const n = raw.trim() === '' ? Number.NaN : Number(raw)
+          if (Number.isFinite(n)) onChange(n)
+        }}
+      />
+      {invalid && (
+        <p id={errorId} role="alert" className="text-xs text-destructive">
+          Ingresá un número
+        </p>
+      )}
+    </div>
   )
 }
 

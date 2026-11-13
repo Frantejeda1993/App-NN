@@ -44,3 +44,9 @@ coverage
 test-results/
 playwright-report/
 blob-report/
+
+# graphify: se versionan graph.json, GRAPH_REPORT.md, graph.html y manifest.json
+graphify-out/cache/
+graphify-out/.graphify_*
+graphify-out/cost.json
+graphify-out/obsidian/

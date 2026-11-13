@@ -1,21 +1,20 @@
-import { ArrowLeft, Box, Copy, CopyPlus, FileDown, Pencil, Plus, Save, Trash2 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { ArrowLeft, Box, CopyPlus, FileDown, Plus, Save, Trash2 } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { Badge, Card, Field, Input, Select, Textarea } from '@/components/ui/form'
-import { MoneyInput } from '@/components/ui/money-input'
 import { useData, useMyEmail } from '@/data/DataProvider'
 import type { Client, Project, Quote, Template } from '@/data/api'
-import { useClients, useProjects, useQuote, useTemplates, useWorkshopSettings } from '@/data/hooks'
+import { useClients, useProjects, useQuote, useQuotes, useTemplates, useWorkshopSettings } from '@/data/hooks'
 import { formatDateEs, todayIso } from '@/domain/dates'
-import { formatEuros } from '@/domain/money'
 import { bpToPercent, percentToBp } from '@/domain/percent'
 import { computeQuote, type RatesLike } from '@/domain/quote'
 import { shoppingList, type ShoppingCatalog } from '@/domain/shopping'
 import {
   STATUS_LABELS,
   applyStatus,
+  fallbackAcceptedQuote,
   isAcceptedStatus,
   itemFromTemplate,
   newLocalId,
@@ -24,7 +23,7 @@ import {
   projectPatchForQuote,
 } from '@/domain/quoteLifecycle'
 import { Furniture3DView } from '@/features/furniture/Furniture3DView'
-import { FurnitureItemEditor, type CatalogRefs, type FurnitureDraft } from '@/features/furniture/FurnitureItemEditor'
+import type { CatalogRefs } from '@/features/furniture/FurnitureItemEditor'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import {
   FurnitureItemSchema,
@@ -36,7 +35,10 @@ import {
   type WorkshopSettings,
 } from '@/model'
 import { pdfFileName, quotePdfModel } from '@/domain/quotePdf'
-import { AdjustmentsEditor, Breakdown, FreeLinesEditor, QuoteSummary } from './QuoteParts'
+import { withEditedItem, type ItemEdit } from './itemEdit'
+import { QuoteItemDialog } from './QuoteItemDialog'
+import { QuoteItemRow } from './QuoteItemRow'
+import { AdjustmentsEditor, FreeLinesEditor, QuoteSummary } from './QuoteParts'
 import { ShoppingListCard } from './ShoppingListCard'
 import { QUOTE_TONES, useQuoteCatalog } from './shared'
 
@@ -53,6 +55,8 @@ const ACTION_LABELS: Record<QuoteStatus, string> = {
   finalizado: 'Finalizar',
   archivado: 'Archivar',
 }
+
+const CONFLICT_MESSAGE = 'Otro socio modificó este presupuesto mientras editabas. Descartá tus cambios para ver los suyos.'
 
 const msOf = (q: { updatedAt: unknown }) => (q.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0
 
@@ -74,13 +78,14 @@ const stableKey = (v: unknown): string =>
 export function QuoteEditorPage() {
   const { id = '' } = useParams()
   const quote = useQuote(id)
+  const quotes = useQuotes()
   const catalog = useQuoteCatalog()
   const projects = useProjects()
   const clients = useClients()
   const templates = useTemplates()
   const settings = useWorkshopSettings()
 
-  if (quote === undefined || !catalog || !projects || !clients || !templates || !settings) {
+  if (quote === undefined || !quotes || !catalog || !projects || !clients || !templates || !settings) {
     return <p className="text-sm text-muted-foreground">Cargando…</p>
   }
   if (quote === null) {
@@ -97,6 +102,7 @@ export function QuoteEditorPage() {
     <Editor
       key={quote.id}
       quote={quote}
+      quotes={quotes}
       refs={catalog.refs}
       maps={catalog.maps}
       rates={catalog.rates}
@@ -109,14 +115,9 @@ export function QuoteEditorPage() {
   )
 }
 
-interface ItemEdit {
-  index: number | null
-  item: FurnitureItem
-  errors: Record<string, string>
-}
-
 function Editor({
   quote,
+  quotes,
   refs,
   maps,
   rates,
@@ -127,6 +128,7 @@ function Editor({
   workshop,
 }: {
   quote: Quote
+  quotes: Quote[]
   refs: CatalogRefs
   maps: ShoppingCatalog
   rates: RatesLike
@@ -149,9 +151,10 @@ function Editor({
   const [lastWritten, setLastWritten] = useState<string | null>(null)
   const [itemEdit, setItemEdit] = useState<ItemEdit | null>(null)
   const [openItem, setOpenItem] = useState<string | null>(null)
-  // Pestaña de la ventana del mueble y vista 3D (un mueble o todos).
-  const [itemTab, setItemTab] = useState<'datos' | '3d'>('datos')
   const [view3d, setView3d] = useState<{ title: string; items: { key: string; label?: string; item: FurnitureItem }[] } | null>(null)
+  // Texto de la seña mientras se escribe (vacío o inválido no pisa el valor guardado).
+  const [depositText, setDepositText] = useState<string | null>(null)
+  const creatingVersion = useRef(false)
   const materialName = useCallback((id: string | null) => (id ? maps.materials.get(id)?.name : undefined), [maps])
 
   const serverMs = msOf(quote)
@@ -176,11 +179,25 @@ function Editor({
   const project = projects.find((p) => p.id === draft.projectId) ?? null
   const client = clients.find((c) => c.id === (draft.clientId ?? project?.clientId))
 
-  /** Valida, guarda con totales y (si hace falta) actualiza el proyecto. */
-  /** `message` null = guardado silencioso (solo avisa si falla). */
+  /** El proyecto a actualizar junto con el presupuesto (mismo lote), si hace falta. */
+  const projectUpdate = (next: QuoteData) => {
+    const p = next.projectId ? projects.find((x) => x.id === next.projectId) : undefined
+    if (!p) return undefined
+    const patch = projectPatchForQuote(
+      p,
+      { id: quote.id, ...next },
+      { previousStatus: draft.status, fallbackAcceptedId: fallbackAcceptedQuote(quotes, p.id, quote.id) },
+    )
+    return patch ? { id: p.id, next: ProjectDataSchema.parse({ ...p, ...patch }) } : undefined
+  }
+
+  /**
+   * Valida y guarda con totales; el proyecto (si cambia) va en el mismo lote.
+   * `message` null = guardado silencioso (solo avisa si falla).
+   */
   const write = (next: QuoteData, message: string | null) => {
     if (conflict) {
-      notifyError(new Error('Otro socio modificó este presupuesto mientras editabas. Descartá tus cambios para ver los suyos.'))
+      notifyError(new Error(CONFLICT_MESSAGE))
       return false
     }
     const t = computeQuote(next, maps, rates)
@@ -205,19 +222,37 @@ function Editor({
       return false
     }
     try {
-      setLastWritten(stableKey(parsed.data))
-      const res = api.updateQuote(quote.id, parsed.data, me)
-      if (message) notifyWrite(res, message)
+      const project = projectUpdate(parsed.data)
+      // El servidor lo guarda con rev + 1: así lo reconocemos como nuestro cuando llega.
+      const written = { ...parsed.data, rev: parsed.data.rev + 1 }
+      setLastWritten(stableKey(written))
+      const res = api.updateQuote(quote.id, parsed.data, me, project)
+      if (message) notifyWrite(res, project ? `${message} · proyecto actualizado` : message)
       else res.committed.catch(notifyError)
-      const p = parsed.data.projectId ? projects.find((x) => x.id === parsed.data.projectId) : undefined
-      const patch = p ? projectPatchForQuote(p, { id: quote.id, ...parsed.data }) : null
-      if (p && patch) notifyWrite(api.updateProject(p.id, ProjectDataSchema.parse({ ...p, ...patch }), me), 'Proyecto actualizado')
-      setDraftState(parsed.data)
+      setDraftState(written)
       setDirty(false)
       return true
     } catch (e) {
       notifyError(e)
       return false
+    }
+  }
+
+  /**
+   * Marcar compras guarda SOLO la lista de compras sobre lo que está en el
+   * servidor: nunca se cuelan otros cambios sin guardar del borrador.
+   */
+  const togglePurchased = (key: string, bought: boolean) => {
+    if (conflict) return notifyError(new Error(CONFLICT_MESSAGE))
+    const base = dataOf(quote)
+    const purchased = bought ? [...new Set([...base.purchased, key])] : base.purchased.filter((k) => k !== key)
+    try {
+      const res = api.updateQuote(quote.id, { ...base, purchased }, me)
+      res.committed.catch(notifyError)
+      setLastWritten(stableKey({ ...base, purchased, rev: base.rev + 1 }))
+      setDraftState((d) => ({ ...d, purchased, rev: base.rev + 1 }))
+    } catch (e) {
+      notifyError(e)
     }
   }
 
@@ -232,11 +267,14 @@ function Editor({
 
   const newVersion = () => {
     if (dirty) return notifyError(new Error('Guardá o descartá los cambios antes de crear una versión nueva.'))
+    if (creatingVersion.current) return
+    creatingVersion.current = true
     try {
       const res = api.createQuote(newVersionInput({ ...dataOf(quote), id: quote.id }, today, validityDays), me)
       notifyWrite(res, `Versión ${quote.version + 1} creada`)
       navigate(`/presupuestos/${res.id}`)
     } catch (e) {
+      creatingVersion.current = false
       notifyError(e)
     }
   }
@@ -270,10 +308,7 @@ function Editor({
   }
 
   // ---- muebles ----
-  const startItem = (item: FurnitureItem, index: number | null) => {
-    setItemTab('datos')
-    setItemEdit({ index, item: structuredClone(item), errors: {} })
-  }
+  const startItem = (item: FurnitureItem, itemId: string | null) => setItemEdit({ itemId, item: structuredClone(item), errors: {} })
   const blankItem = () =>
     startItem(
       {
@@ -293,15 +328,13 @@ function Editor({
     if (!itemEdit) return
     const parsed = FurnitureItemSchema.safeParse(itemEdit.item)
     if (!parsed.success) {
-      const errs: Record<string, string> = {}
-      for (const i of parsed.error.issues) errs[String(i.path[0])] ??= i.message
+      const errs = Object.fromEntries(
+        [...parsed.error.issues].reverse().map((i) => [String(i.path[0]), i.message] as const),
+      )
       setItemEdit({ ...itemEdit, errors: errs })
       return
     }
-    const items = [...draft.items]
-    if (itemEdit.index === null) items.push(parsed.data)
-    else items[itemEdit.index] = parsed.data
-    setDraft({ ...draft, items })
+    setDraft({ ...draft, items: withEditedItem(draft.items, itemEdit, parsed.data) })
     setItemEdit(null)
   }
 
@@ -309,18 +342,21 @@ function Editor({
   // comparten entre muebles, así que el precio depende de todo el presupuesto).
   const preview = useMemo(() => {
     if (!itemEdit) return null
-    const items = [...draft.items]
-    if (itemEdit.index === null) items.push(itemEdit.item)
-    else items[itemEdit.index] = itemEdit.item
+    const items = withEditedItem(draft.items, itemEdit, itemEdit.item)
+    const idx = items.findIndex((x) => x.id === itemEdit.item.id)
     try {
-      return computeQuote({ ...draft, items }, maps, rates).items[itemEdit.index ?? items.length - 1]
+      return computeQuote({ ...draft, items }, maps, rates).items[idx] ?? null
     } catch {
       return null
     }
   }, [itemEdit, draft, maps, rates])
 
-  const activeTemplates = templates
+  const updateItem = (id: string, fn: (it: FurnitureItem) => FurnitureItem) =>
+    setDraft({ ...draft, items: draft.items.map((x) => (x.id === id ? fn(x) : x)) })
+
   const allAccepted = draft.items.every((i) => i.accepted) && draft.freeLines.every((l) => l.accepted)
+  const depositValid = (s: string) => s.trim() !== '' && Number.isFinite(Number(s)) && Number(s) >= 0 && Number(s) <= 100
+  const depositError = depositText !== null && !depositValid(depositText) ? 'Un número entre 0 y 100' : undefined
 
   return (
     <section className="flex max-w-6xl flex-col gap-4 pb-20">
@@ -398,12 +434,7 @@ function Editor({
           <Card>
             <div className="grid gap-3 md:grid-cols-2">
               <Field id="q-title" label="Título *">
-                <Input
-                  id="q-title"
-                  value={draft.title}
-                  disabled={!editable}
-                  onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                />
+                <Input id="q-title" value={draft.title} disabled={!editable} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
               </Field>
               <Field id="q-project" label="Proyecto">
                 <Select
@@ -412,11 +443,7 @@ function Editor({
                   disabled={!editable}
                   onChange={(e) => {
                     const p = projects.find((x) => x.id === e.target.value)
-                    setDraft({
-                      ...draft,
-                      projectId: p?.id ?? null,
-                      clientId: p?.clientId ?? draft.clientId,
-                    })
+                    setDraft({ ...draft, projectId: p?.id ?? null, clientId: p?.clientId ?? draft.clientId })
                   }}
                 >
                   <option value="">Sin proyecto</option>
@@ -471,7 +498,7 @@ function Editor({
               </div>
               {editable && (
                 <div className="flex flex-wrap gap-2">
-                  {activeTemplates.length > 0 && (
+                  {templates.length > 0 && (
                     <Select
                       aria-label="Agregar desde plantilla"
                       className="w-auto"
@@ -482,7 +509,7 @@ function Editor({
                       }}
                     >
                       <option value="">Agregar desde plantilla…</option>
-                      {activeTemplates.map((t) => (
+                      {templates.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.category ? `${t.category} · ` : ''}
                           {t.name}
@@ -499,191 +526,35 @@ function Editor({
 
             {draft.items.length === 0 && <p className="text-sm text-muted-foreground">Todavía no hay muebles.</p>}
             <ul aria-label="Muebles del presupuesto" className="flex flex-col divide-y divide-border">
-              {draft.items.map((it, i) => {
-                const b = totals.items[i]
-                const open = openItem === it.id
-                return (
-                  <li key={it.id} className="py-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        {acceptable && (
-                          <input
-                            type="checkbox"
-                            aria-label={`Aceptado: ${it.name}`}
-                            checked={it.accepted}
-                            onChange={(e) =>
-                              setDraft({
-                                ...draft,
-                                items: draft.items.map((x, j) => (j === i ? { ...x, accepted: e.target.checked } : x)),
-                              })
-                            }
-                          />
-                        )}
-                        <button
-                          type="button"
-                          className="min-w-0 text-left"
-                          onClick={() => setOpenItem(open ? null : it.id)}
-                          aria-expanded={open}
-                        >
-                          <p className="truncate text-sm font-medium">
-                            {it.quantity > 1 && `${it.quantity} × `}
-                            {it.name}
-                            {!it.accepted && draft.status !== 'borrador' && (
-                              <span className="ml-2 text-xs text-muted-foreground">(no aceptado)</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {it.widthMm} × {it.heightMm} × {it.depthMm} mm
-                            {it.doors.count > 0 && ` · ${it.doors.count} puerta${it.doors.count === 1 ? '' : 's'}`}
-                            {it.drawers.count > 0 && ` · ${it.drawers.count} cajón${it.drawers.count === 1 ? '' : 'es'}`}
-                          </p>
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="mr-2 text-sm font-medium tabular-nums">{formatEuros(b?.totalCents ?? 0)}</span>
-                        <Button size="icon" variant="ghost" aria-label={`Ver ${it.name} en 3D`} onClick={() => setView3d({ title: it.name, items: [{ key: it.id, item: it }] })}>
-                          <Box />
-                        </Button>
-                        {editable && (
-                          <>
-                            <Button size="icon" variant="ghost" aria-label={`Editar ${it.name}`} onClick={() => startItem(it, i)}>
-                              <Pencil />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Duplicar ${it.name}`}
-                              onClick={() =>
-                                setDraft({
-                                  ...draft,
-                                  items: [
-                                    ...draft.items,
-                                    {
-                                      ...structuredClone(it),
-                                      id: newLocalId(),
-                                    },
-                                  ],
-                                })
-                              }
-                            >
-                              <Copy />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Quitar ${it.name}`}
-                              onClick={() =>
-                                setDraft({
-                                  ...draft,
-                                  items: draft.items.filter((_, j) => j !== i),
-                                })
-                              }
-                            >
-                              <Trash2 />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {open && b && (
-                      <div className="mt-2 rounded-lg bg-muted/50 p-3">
-                        <Breakdown b={b} />
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
+              {draft.items.map((it, i) => (
+                <QuoteItemRow
+                  key={it.id}
+                  item={it}
+                  breakdown={totals.items[i]}
+                  acceptable={acceptable}
+                  editable={editable}
+                  isDraft={draft.status === 'borrador'}
+                  open={openItem === it.id}
+                  onToggleOpen={() => setOpenItem(openItem === it.id ? null : it.id)}
+                  onAcceptedChange={(accepted) => updateItem(it.id, (x) => ({ ...x, accepted }))}
+                  onView3d={() => setView3d({ title: it.name, items: [{ key: it.id, item: it }] })}
+                  onEdit={() => startItem(it, it.id)}
+                  onDuplicate={() => setDraft({ ...draft, items: [...draft.items, { ...structuredClone(it), id: newLocalId() }] })}
+                  onRemove={() => setDraft({ ...draft, items: draft.items.filter((x) => x.id !== it.id) })}
+                />
+              ))}
             </ul>
 
-            <Dialog
-              open={itemEdit !== null}
+            <QuoteItemDialog
+              key={itemEdit ? (itemEdit.itemId ?? 'nuevo') : 'cerrado'}
+              edit={itemEdit}
+              onChange={setItemEdit}
               onClose={() => setItemEdit(null)}
-              title={itemEdit?.index === null ? 'Nuevo mueble' : `Editar mueble${itemEdit?.item.name ? `: ${itemEdit.item.name}` : ''}`}
-              footer={
-                itemEdit && (
-                  <div className="flex flex-col gap-2">
-                    {Object.keys(itemEdit.errors).length > 0 && (
-                      <p role="alert" className="text-sm text-destructive">
-                        Revisá los datos del mueble: {Object.values(itemEdit.errors).join(' · ')}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm">
-                        Precio del mueble: <strong className="tabular-nums">{formatEuros(preview?.totalCents ?? 0)}</strong>
-                      </p>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setItemEdit(null)}>
-                          Cancelar
-                        </Button>
-                        <Button type="submit" form="qi-form">
-                          {itemEdit.index === null ? 'Agregar mueble' : 'Guardar mueble'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-            >
-              {itemEdit && (
-                <div role="tablist" aria-label="Vista del mueble" className="mb-4 flex gap-1">
-                  {(['datos', '3d'] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      role="tab"
-                      aria-selected={itemTab === t}
-                      onClick={() => setItemTab(t)}
-                      className={
-                        itemTab === t
-                          ? 'rounded-full bg-primary px-3 py-1 text-sm text-primary-foreground'
-                          : 'rounded-full bg-muted px-3 py-1 text-sm text-muted-foreground hover:text-foreground'
-                      }
-                    >
-                      {t === 'datos' ? 'Datos' : 'Vista 3D'}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {itemEdit && itemTab === '3d' && (
-                <Furniture3DView className="h-[60dvh]" items={[{ key: 'edit', item: itemEdit.item }]} materialName={materialName} />
-              )}
-              {itemEdit && (
-                <form
-                  hidden={itemTab !== 'datos'}
-                  id="qi-form"
-                  noValidate
-                  className="flex flex-col gap-4"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    saveItem()
-                  }}
-                >
-                  <FurnitureItemEditor
-                    value={itemEdit.item}
-                    onChange={(v: FurnitureDraft) => setItemEdit({ ...itemEdit, item: { ...itemEdit.item, ...v } })}
-                    catalog={refs}
-                    errors={itemEdit.errors}
-                    idPrefix="qi"
-                  />
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <Field id="qi-final" label="Precio final del mueble (€)" hint="Vacío = usar el calculado">
-                      <MoneyInput
-                        id="qi-final"
-                        nullable
-                        placeholder="Calculado"
-                        cents={itemEdit.item.finalPriceCents}
-                        onChange={(c) => setItemEdit({ ...itemEdit, item: { ...itemEdit.item, finalPriceCents: c } })}
-                      />
-                    </Field>
-                    {preview && (
-                      <div className="rounded-lg bg-muted/50 p-3" aria-label="Vista previa del precio">
-                        <Breakdown b={preview} />
-                      </div>
-                    )}
-                  </div>
-                </form>
-              )}
-            </Dialog>
+              onSave={saveItem}
+              preview={preview}
+              refs={refs}
+              materialName={materialName}
+            />
 
             <Dialog open={view3d !== null} onClose={() => setView3d(null)} title={view3d ? `Vista 3D: ${view3d.title}` : ''}>
               {view3d && <Furniture3DView className="h-[70dvh]" items={view3d.items} materialName={materialName} />}
@@ -705,18 +576,14 @@ function Editor({
           {(editable || draft.adjustments.length > 0) && (
             <Card>
               <h2 className="mb-2 font-semibold">Ajustes</h2>
-              <AdjustmentsEditor
-                items={draft.adjustments}
-                readOnly={!editable}
-                onChange={(adjustments) => setDraft({ ...draft, adjustments })}
-              />
+              <AdjustmentsEditor items={draft.adjustments} readOnly={!editable} onChange={(adjustments) => setDraft({ ...draft, adjustments })} />
             </Card>
           )}
 
           <Card>
             <h2 className="mb-2 font-semibold">Condiciones</h2>
             <div className="grid gap-3 md:grid-cols-2">
-              <Field id="q-deposit" label="Seña (%)">
+              <Field id="q-deposit" label="Seña (%)" error={depositError}>
                 <Input
                   id="q-deposit"
                   type="number"
@@ -724,11 +591,15 @@ function Editor({
                   max={100}
                   step="1"
                   disabled={!editable}
-                  value={bpToPercent(draft.depositBp)}
+                  aria-invalid={!!depositError}
+                  value={depositText ?? String(bpToPercent(draft.depositBp))}
                   onChange={(e) => {
-                    const n = Number(e.target.value)
-                    if (Number.isFinite(n) && n >= 0 && n <= 100) setDraft({ ...draft, depositBp: percentToBp(n) })
+                    const s = e.target.value
+                    setDepositText(s)
+                    // Vacío o fuera de rango: no se guarda (antes un campo vacío quedaba en 0 %).
+                    if (depositValid(s)) setDraft({ ...draft, depositBp: percentToBp(Number(s)) })
                   }}
+                  onBlur={() => setDepositText(null)}
                 />
               </Field>
               <Field id="q-valid" label="Válido hasta">
@@ -741,20 +612,10 @@ function Editor({
                 />
               </Field>
               <Field id="q-terms" label="Condiciones de pago y plazo" className="md:col-span-2">
-                <Textarea
-                  id="q-terms"
-                  disabled={!editable}
-                  value={draft.terms}
-                  onChange={(e) => setDraft({ ...draft, terms: e.target.value })}
-                />
+                <Textarea id="q-terms" disabled={!editable} value={draft.terms} onChange={(e) => setDraft({ ...draft, terms: e.target.value })} />
               </Field>
               <Field id="q-notes" label="Observaciones" className="md:col-span-2">
-                <Textarea
-                  id="q-notes"
-                  disabled={!editable}
-                  value={draft.notes}
-                  onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                />
+                <Textarea id="q-notes" disabled={!editable} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
               </Field>
             </div>
           </Card>
@@ -764,12 +625,7 @@ function Editor({
               title={draft.title}
               projectId={draft.projectId}
               purchased={draft.purchased}
-              onTogglePurchased={(key, bought) =>
-                write(
-                  { ...draft, purchased: bought ? [...new Set([...draft.purchased, key])] : draft.purchased.filter((k) => k !== key) },
-                  null,
-                )
-              }
+              onTogglePurchased={togglePurchased}
             />
           )}
         </div>
@@ -796,6 +652,7 @@ function Editor({
                   setBaseMs(serverMs)
                   setDirty(false)
                   setItemEdit(null)
+                  setDepositText(null)
                 }}
               >
                 Descartar

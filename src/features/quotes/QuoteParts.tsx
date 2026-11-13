@@ -115,7 +115,7 @@ export function FreeLinesEditor({
           {acceptable ? (
             <input
               type="checkbox"
-              aria-label={`Aceptada: ${l.description || 'línea'}`}
+              aria-label={`Aceptada: ${l.description || `línea ${i + 1}`}`}
               checked={l.accepted}
               onChange={(e) => set(i, { accepted: e.target.checked })}
             />
@@ -123,7 +123,7 @@ export function FreeLinesEditor({
             <span />
           )}
           <Input
-            aria-label="Descripción"
+            aria-label={`Descripción línea ${i + 1}`}
             value={l.description}
             disabled={readOnly}
             onChange={(e) => set(i, { description: e.target.value })}
@@ -132,10 +132,10 @@ export function FreeLinesEditor({
           {readOnly ? (
             <span className="text-right tabular-nums">{formatEuros(l.amountCents)}</span>
           ) : (
-            <MoneyInput id={`fl-${l.id}`} aria-label="Importe" cents={l.amountCents} onChange={(c) => set(i, { amountCents: c ?? 0 })} />
+            <MoneyInput id={`fl-${l.id}`} aria-label={`Importe línea ${i + 1}`} cents={l.amountCents} onChange={(c) => set(i, { amountCents: c ?? 0 })} />
           )}
           {!readOnly ? (
-            <Button size="icon" variant="ghost" aria-label="Quitar línea" onClick={() => onChange(lines.filter((_, j) => j !== i))}>
+            <Button size="icon" variant="ghost" aria-label={`Quitar línea ${i + 1}`} onClick={() => onChange(lines.filter((_, j) => j !== i))}>
               <Trash2 />
             </Button>
           ) : (
@@ -184,7 +184,7 @@ export function AdjustmentsEditor({
       {items.map((a, i) => (
         <div key={a.id} className="grid grid-cols-[1fr_8rem_auto] items-center gap-2">
           <Input
-            aria-label="Motivo"
+            aria-label={`Motivo ajuste ${i + 1}`}
             value={a.reason}
             disabled={readOnly}
             onChange={(e) => set(i, { reason: e.target.value })}
@@ -195,14 +195,14 @@ export function AdjustmentsEditor({
           ) : (
             <MoneyInput
               id={`adj-${a.id}`}
-              aria-label="Importe del ajuste"
+              aria-label={`Importe del ajuste ${i + 1}`}
               allowNegative
               cents={a.amountCents}
               onChange={(c) => set(i, { amountCents: c ?? 0 })}
             />
           )}
           {!readOnly ? (
-            <Button size="icon" variant="ghost" aria-label="Quitar ajuste" onClick={() => onChange(items.filter((_, j) => j !== i))}>
+            <Button size="icon" variant="ghost" aria-label={`Quitar ajuste ${i + 1}`} onClick={() => onChange(items.filter((_, j) => j !== i))}>
               <Trash2 />
             </Button>
           ) : (

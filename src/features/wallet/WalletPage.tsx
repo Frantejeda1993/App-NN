@@ -4,9 +4,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge, Card, Field, Input, Select } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
-import { useMovements } from '@/data/hooks'
+import { useMovements, useOpeningBalances } from '@/data/hooks'
 import { formatEuros } from '@/domain/money'
 import { boxBalances, filterMovements, memberDebts, type MovementFilters } from '@/domain/wallet'
+import { OpeningBalancesTab } from './OpeningBalancesTab'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { BoxDataSchema, MOVEMENT_TYPES, type MovementType } from '@/model'
@@ -16,13 +17,30 @@ import { MovementRow } from './MovementRow'
 import { TYPE_LABELS } from './labels'
 import { useWalletNames } from './useWalletNames'
 
-const TABS = { resumen: 'Resumen', movimientos: 'Movimientos', cajas: 'Cajas', gastos: 'Gastos generales' } as const
+const TABS = {
+  resumen: 'Resumen',
+  movimientos: 'Movimientos',
+  cajas: 'Cajas',
+  gastos: 'Gastos generales',
+  inicial: 'Configuración inicial',
+} as const
 type Tab = keyof typeof TABS
+const TAB_KEYS = Object.keys(TABS) as Tab[]
 
 export function WalletPage() {
   const [params, setParams] = useSearchParams()
   const requested = params.get('tab')
-  const tab: Tab = requested === 'movimientos' || requested === 'cajas' || requested === 'gastos' ? requested : 'resumen'
+  const tab: Tab = TAB_KEYS.includes(requested as Tab) ? (requested as Tab) : 'resumen'
+  const select = (t: Tab) => setParams(t === 'resumen' ? {} : { tab: t })
+  // Flechas izquierda/derecha entre pestañas (patrón de tabs accesibles).
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = TAB_KEYS.indexOf(tab)
+    const next = e.key === 'ArrowRight' ? TAB_KEYS[(i + 1) % TAB_KEYS.length] : e.key === 'ArrowLeft' ? TAB_KEYS[(i - 1 + TAB_KEYS.length) % TAB_KEYS.length] : null
+    if (!next) return
+    e.preventDefault()
+    select(next)
+    document.getElementById(`wallet-tab-${next}`)?.focus()
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -32,13 +50,17 @@ export function WalletPage() {
           <Plus /> Nuevo movimiento
         </Link>
       </div>
-      <div role="tablist" aria-label="Billetera" className="flex gap-1">
-        {(Object.keys(TABS) as Tab[]).map((t) => (
+      <div role="tablist" aria-label="Billetera" className="flex flex-wrap gap-1" onKeyDown={onTabKey}>
+        {TAB_KEYS.map((t) => (
           <button
             key={t}
+            id={`wallet-tab-${t}`}
+            type="button"
             role="tab"
             aria-selected={tab === t}
-            onClick={() => setParams(t === 'resumen' ? {} : { tab: t })}
+            aria-controls={tab === t ? 'wallet-panel' : undefined}
+            tabIndex={tab === t ? 0 : -1}
+            onClick={() => select(t)}
             className={cn(
               'rounded-full px-3 py-1 text-sm',
               tab === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -48,15 +70,19 @@ export function WalletPage() {
           </button>
         ))}
       </div>
-      {tab === 'resumen' ? (
-        <DashboardTab />
-      ) : tab === 'movimientos' ? (
-        <MovementsTab />
-      ) : tab === 'cajas' ? (
-        <BoxesTab />
-      ) : (
-        <GeneralExpensesTab />
-      )}
+      <div id="wallet-panel" role="tabpanel" aria-labelledby={`wallet-tab-${tab}`}>
+        {tab === 'resumen' ? (
+          <DashboardTab />
+        ) : tab === 'movimientos' ? (
+          <MovementsTab />
+        ) : tab === 'cajas' ? (
+          <BoxesTab />
+        ) : tab === 'gastos' ? (
+          <GeneralExpensesTab />
+        ) : (
+          <OpeningBalancesTab />
+        )}
+      </div>
     </section>
   )
 }
@@ -67,11 +93,15 @@ function MovementsTab() {
   const [filters, setFilters] = useState<MovementFilters>({})
   const set = (patch: Partial<MovementFilters>) => setFilters((f) => ({ ...f, ...patch }))
 
+  const opening = useOpeningBalances()
   const filtered = useMemo(() => filterMovements(movements ?? [], filters), [movements, filters])
-  const debts = useMemo(() => memberDebts(movements ?? []), [movements])
-  const owed = Object.entries(debts).filter(([, c]) => c > 0)
+  const debts = useMemo(() => {
+    const initial = Object.fromEntries(Object.entries(opening?.opening.people ?? {}).map(([k, p]) => [k, p.debt]))
+    return memberDebts(movements ?? [], initial)
+  }, [movements, opening])
+  const owed = Object.entries(debts).filter(([k, c]) => k !== 'taller' && c > 0)
 
-  if (!movements || names.loading) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!movements || names.loading || !opening) return <p className="text-sm text-muted-foreground">Cargando…</p>
 
   return (
     <div className="flex flex-col gap-4">
@@ -162,15 +192,17 @@ function BoxesTab() {
   const api = useData()
   const me = useMyEmail()
   const movements = useMovements()
+  const opening = useOpeningBalances()
   const { boxes } = useWalletNames()
   const [newName, setNewName] = useState('')
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
 
+  // Saldo = dinero inicial (configuración inicial) + movimientos.
   const balances = useMemo(
-    () => boxBalances(movements ?? [], (boxes ?? []).map((b) => b.id)),
-    [movements, boxes],
+    () => boxBalances(movements ?? [], (boxes ?? []).map((b) => b.id), opening?.opening.boxes),
+    [movements, boxes, opening],
   )
-  if (!boxes || !movements) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!boxes || !movements || !opening) return <p className="text-sm text-muted-foreground">Cargando…</p>
   const total = boxes.filter((b) => b.active).reduce((s, b) => s + balances[b.id], 0)
 
   const save = (fn: () => ReturnType<typeof api.createBox>, msg: string) => {

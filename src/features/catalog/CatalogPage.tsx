@@ -1,5 +1,5 @@
 import { Database, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, Field, Input } from '@/components/ui/form'
@@ -48,30 +48,64 @@ export function CatalogPage() {
   const rates = useServiceRates()
   // Evita duplicar el catálogo con un doble clic mientras llegan las escrituras.
   const [seeding, setSeeding] = useState(false)
+  const seedingRef = useRef(false)
+  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({})
 
   if (!materials || !edges || !hardware || !rates) return <p className="text-sm text-muted-foreground">Cargando…</p>
   const empty = materials.length === 0 && edges.length === 0 && hardware.length === 0
 
+  const releaseSeeding = () => {
+    seedingRef.current = false
+    setSeeding(false)
+  }
+
   const seedFromExcel = () => {
-    if (seeding) return
+    // El ref corta el doble clic en el mismo tick (el estado todavía no se aplicó).
+    if (seedingRef.current) return
+    seedingRef.current = true
     setSeeding(true)
     try {
       const seed = excelSeed()
-      for (const m of seed.materials) api.createMaterial(m, me).committed.catch(notifyError)
-      for (const e of seed.edgeBanding) api.createEdgeBanding(e, me).committed.catch(notifyError)
-      for (const h of seed.hardware) api.createHardware(h, me).committed.catch(notifyError)
+      const committed = [
+        ...seed.materials.map((m) => api.createMaterial(m, me).committed),
+        ...seed.edgeBanding.map((e) => api.createEdgeBanding(e, me).committed),
+        ...seed.hardware.map((h) => api.createHardware(h, me).committed),
+      ]
+      for (const c of committed) c.catch(notifyError)
       // No pisar tarifas ya guardadas: solo completa el corte/canteado si nunca se configuró.
       if (!rates.exists || rates.rates.cutAndEdgePerM2Cents === ServiceRatesSchema.parse({}).cutAndEdgePerM2Cents) {
         api.saveServiceRates({ ...rates.rates, ...seed.services }, rates.exists, me).committed.catch(notifyError)
       }
+      // Si todas las altas se rechazan, el catálogo sigue vacío: se puede reintentar.
+      void Promise.allSettled(committed).then((results) => {
+        if (results.every((r) => r.status === 'rejected')) releaseSeeding()
+      })
       notifyWrite(
         { id: 'seed', committed: Promise.resolve() },
         `Cargados ${seed.materials.length} materiales, ${seed.hardware.length} herrajes y ${seed.edgeBanding.length} cantos`,
       )
     } catch (e) {
       notifyError(e)
-      setSeeding(false)
+      releaseSeeding()
     }
+  }
+
+  const tabKeys = Object.keys(TABS) as Tab[]
+  const selectTab = (t: Tab) => setParams(t === 'materiales' ? {} : { tab: t })
+  const onTabKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    const target =
+      e.key === 'Home'
+        ? tabKeys[0]
+        : e.key === 'End'
+          ? tabKeys[tabKeys.length - 1]
+          : step !== 0
+            ? tabKeys[(tabKeys.indexOf(tab) + step + tabKeys.length) % tabKeys.length]
+            : null
+    if (!target) return
+    e.preventDefault()
+    selectTab(target)
+    tabRefs.current[target]?.focus()
   }
 
   return (
@@ -89,12 +123,21 @@ export function CatalogPage() {
         </Card>
       )}
       <div role="tablist" aria-label="Catálogo" className="flex flex-wrap gap-1">
-        {(Object.keys(TABS) as Tab[]).map((t) => (
+        {tabKeys.map((t) => (
           <button
             key={t}
+            ref={(el) => {
+              tabRefs.current[t] = el
+            }}
+            type="button"
             role="tab"
+            id={`catalog-tab-${t}`}
             aria-selected={tab === t}
-            onClick={() => setParams(t === 'materiales' ? {} : { tab: t })}
+            // Solo se renderiza el panel activo: no apuntar a ids inexistentes.
+            aria-controls={tab === t ? `catalog-panel-${t}` : undefined}
+            tabIndex={tab === t ? 0 : -1}
+            onClick={() => selectTab(t)}
+            onKeyDown={onTabKeyDown}
             className={cn(
               'rounded-full px-3 py-1 text-sm',
               tab === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -105,6 +148,7 @@ export function CatalogPage() {
         ))}
       </div>
 
+      <div role="tabpanel" id={`catalog-panel-${tab}`} aria-labelledby={`catalog-tab-${tab}`} className="flex flex-col gap-4">
       {tab === 'materiales' && (
         <SimpleCatalogTab
           title="Materiales (tableros)"
@@ -169,6 +213,7 @@ export function CatalogPage() {
 
       {tab === 'tarifas' && <RatesTab />}
       {tab === 'plantillas' && <TemplatesTab />}
+      </div>
     </section>
   )
 }
@@ -266,6 +311,9 @@ function TemplatesTab() {
   const materials = useMaterials()
   const hardware = useHardware()
   const [seeding, setSeeding] = useState(false)
+  // El ref corta el doble clic en el mismo tick. Tras un alta exitosa queda
+  // puesto: en cuanto existen las plantillas, el botón deja de mostrarse.
+  const seedingRef = useRef(false)
   if (!templates || !materials || !hardware) return <p className="text-sm text-muted-foreground">Cargando…</p>
 
   // Una vez cargadas (alguna existe), el botón ya no se muestra.
@@ -274,13 +322,25 @@ function TemplatesTab() {
 
   // Carga las plantillas comunes del Excel que todavía no existan (por nombre).
   const seedTemplates = () => {
-    if (seeding) return
+    if (seedingRef.current) return
+    seedingRef.current = true
     setSeeding(true)
+    const release = () => {
+      seedingRef.current = false
+      setSeeding(false)
+    }
     try {
       const { templates: seed, missing } = excelTemplates(materials, hardware)
       const existing = new Set(templates.map((t) => t.name.trim().toLowerCase()))
       const fresh = seed.filter((t) => !existing.has(t.name.toLowerCase()))
-      for (const t of fresh) api.createTemplate(t, me).committed.catch(notifyError)
+      const committed = fresh.map((t) => api.createTemplate(t, me).committed)
+      for (const c of committed) c.catch(notifyError)
+      // Sin nada nuevo, o si todas las altas fallan, se puede volver a intentar.
+      if (committed.length === 0) release()
+      else
+        void Promise.allSettled(committed).then((results) => {
+          if (results.every((r) => r.status === 'rejected')) release()
+        })
       notifyWrite(
         { id: 'seed-templates', committed: Promise.resolve() },
         fresh.length === 0 ? 'Las plantillas del Excel ya estaban cargadas' : `Cargadas ${fresh.length} plantillas del Excel`,
@@ -290,8 +350,7 @@ function TemplatesTab() {
       }
     } catch (e) {
       notifyError(e)
-    } finally {
-      setSeeding(false)
+      release()
     }
   }
 

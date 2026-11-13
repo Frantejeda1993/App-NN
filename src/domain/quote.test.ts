@@ -81,8 +81,20 @@ describe('itemAreas', () => {
       }),
     )
     expect(a.structure).toBeCloseTo((2 * 0.72 * 0.56 + 2 * 0.6 * 0.56 + 0.6 * 0.56) * 2)
-    expect(a.fronts).toBeCloseTo(0.6 * 0.72 * 2 * 2)
+    // Las dos puertas se reparten el frente: un frente de ancho × alto por mueble.
+    expect(a.fronts).toBeCloseTo(0.6 * 0.72 * 2)
     expect(a.back).toBeCloseTo(0.6 * 0.72 * 2)
+  })
+
+  it('las divisiones suman a la estructura (alto × profundidad cada una)', () => {
+    const base = itemAreas(item({ widthMm: 600, heightMm: 720, depthMm: 560 }))
+    const withDividers = itemAreas(item({ widthMm: 600, heightMm: 720, depthMm: 560, dividers: 2 }))
+    expect(withDividers.structure - base.structure).toBeCloseTo(2 * 0.72 * 0.56)
+  })
+
+  it('un mueble solo con cajones también tiene frente; sin puertas ni cajones no', () => {
+    expect(itemAreas(item({ drawers: { count: 4, slideHardwareId: null } })).fronts).toBeCloseTo(1)
+    expect(itemAreas(item()).fronts).toBe(0)
   })
 })
 
@@ -151,23 +163,23 @@ describe('computeQuote — desglose por mueble', () => {
   it('herrajes, corte, canto y mano de obra sugerida', () => {
     const r = computeQuote(quote([full]), catalog(), rates)
     const b = r.items[0]
-    // m²: estructura 1×2 + frentes 1×2 puertas×2 = 6
-    expect(b.m2).toBe(6)
+    // m²: estructura 1×2 + frente (puertas y cajones lo comparten) 1×2 = 4
+    expect(b.m2).toBe(4)
     expect(b.hardwareCents).toBe((1840 + 2000 + 1000 + 600) * 2 + 300)
-    expect(b.cutCents).toBe(6000)
+    expect(b.cutCents).toBe(4000)
     expect(b.edgeCents).toBe(1200)
-    expect(b.laborSuggestedCents).toBe(6000 + (1000 + 1400 + 600) * 2)
+    expect(b.laborSuggestedCents).toBe(4000 + (1000 + 1400 + 600) * 2)
     expect(b.laborCents).toBe(b.laborSuggestedCents)
-    // 6 m² → 3 placas
-    expect(b.materialCents).toBe(12000)
-    expect(b.totalCents).toBe(12000 + 6000 + 1200 + 11180 + 12000)
+    // 4 m² → 2 placas
+    expect(b.materialCents).toBe(8000)
+    expect(b.totalCents).toBe(8000 + 4000 + 1200 + 11180 + 10000)
   })
 
   it('la mano de obra a mano reemplaza la sugerida y la complejidad suma', () => {
     const b = computeQuote(quote([{ ...full, laborCents: 5000, complexityCents: 700 }]), catalog(), rates).items[0]
     expect(b.laborCents).toBe(5000)
     expect(b.totalCents).toBe(b.computedCents)
-    expect(b.computedCents).toBe(12000 + 6000 + 1200 + 11180 + 5000 + 700)
+    expect(b.computedCents).toBe(8000 + 4000 + 1200 + 11180 + 5000 + 700)
   })
 
   it('el precio final a mano manda sobre el calculado', () => {
@@ -178,7 +190,7 @@ describe('computeQuote — desglose por mueble', () => {
 
   it('el multiplicador es solo referencia: no cambia el total', () => {
     const r = computeQuote(quote([full]), catalog(), rates)
-    expect(r.multiplierRefCents).toBe(Math.round(12000 * 2.3))
+    expect(r.multiplierRefCents).toBe(Math.round(8000 * 2.3))
     expect(r.totalCents).toBe(r.items[0].totalCents)
   })
 })
@@ -204,9 +216,41 @@ describe('computeQuote — totales', () => {
     expect(r.subtotalCents).toBe(34000)
     expect(r.vatCents).toBe(7140)
     expect(r.totalCents).toBe(41140)
-    expect(r.depositCents).toBe(20570)
-    // aceptado: 10000 + 5000 − 2000 = 13000 + 21 %
-    expect(r.acceptedTotalCents).toBe(15730)
+    // aceptado: 15000 de 36000 → el descuento se prorratea: −2000 × 15/36 = −833.
+    // 14167 + 21 % (2975) = 17142
+    expect(r.acceptedTotalCents).toBe(17142)
+    // La seña es sobre lo aceptado, no sobre el total.
+    expect(r.depositCents).toBe(8571)
+  })
+
+  it('aceptado entero: el total aceptado es el total y la seña es sobre el total', () => {
+    const r = computeQuote(
+      quote([item({ id: 'a', finalPriceCents: 10000, accepted: true })], { adjustments: [{ amountCents: -1000 }], depositBp: 3000 }),
+      catalog(),
+      zeroRates,
+    )
+    expect(r.acceptedTotalCents).toBe(r.totalCents)
+    expect(r.depositCents).toBe(2700)
+  })
+
+  it('un descuento grande nunca deja el total aceptado en negativo', () => {
+    const r = computeQuote(
+      quote([item({ id: 'a', finalPriceCents: 100000, accepted: false }), item({ id: 'b', finalPriceCents: 20000, accepted: true })], {
+        adjustments: [{ amountCents: -30000 }],
+      }),
+      catalog(),
+      zeroRates,
+    )
+    // −30000 × 20000/120000 = −5000 → 15000
+    expect(r.acceptedTotalCents).toBe(15000)
+    expect(r.acceptedTotalCents).toBeGreaterThanOrEqual(0)
+  })
+
+  it('el IVA sobre importes negativos redondea igual que sobre positivos', () => {
+    const pos = computeQuote(quote([], { freeLines: [{ amountCents: 250, accepted: true }], vatBp: 1000 }), catalog(), zeroRates)
+    const neg = computeQuote(quote([], { adjustments: [{ amountCents: -250 }], vatBp: 1000 }), catalog(), zeroRates)
+    expect(pos.vatCents).toBe(25)
+    expect(neg.vatCents).toBe(-25)
   })
 
   it('presupuesto vacío da todo cero', () => {

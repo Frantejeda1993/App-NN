@@ -10,6 +10,8 @@ export const positiveCentsSchema = centsSchema.positive('El importe debe ser may
 export const nonNegativeCentsSchema = centsSchema.nonnegative('El importe no puede ser negativo')
 /** Porcentaje en puntos básicos (0–10000 = 0–100 %). */
 export const bpSchema = z.number().int().min(0).max(10000)
+/** Contador de escrituras para concurrencia optimista (documentos viejos: 0). */
+export const revSchema = z.number().int().min(0).default(0)
 
 /** Fecha de negocio sin hora, "YYYY-MM-DD" (sin problemas de zona horaria). */
 export const isoDateSchema = z

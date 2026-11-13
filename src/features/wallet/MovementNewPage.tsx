@@ -4,11 +4,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
 import { useGeneralExpenses, useMovements } from '@/data/hooks'
-import { memberDebts } from '@/domain/wallet'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { MOVEMENT_TYPES, type MovementType } from '@/model'
+import { DistributionForm } from './DistributionForm'
 import { MovementForm } from './MovementForm'
 import { useWalletNames } from './useWalletNames'
+import { useWalletTotals } from './useWalletTotals'
 
 export function MovementNewPage() {
   const api = useData()
@@ -18,7 +19,12 @@ export function MovementNewPage() {
   const names = useWalletNames()
   const movements = useMovements()
   const generalExpenses = useGeneralExpenses()
-  const debts = useMemo(() => memberDebts(movements ?? []), [movements])
+  const totals = useWalletTotals()
+  // Lo que el taller le debe a cada socio (deuda inicial incluida), para el reintegro.
+  const debts = useMemo(
+    () => Object.fromEntries(Object.entries(totals?.alloc ?? {}).map(([k, a]) => [k, a.debt])),
+    [totals],
+  )
 
   const typeParam = params.get('tipo') as MovementType | null
   const projectParam = params.get('proyecto') ?? ''
@@ -28,7 +34,7 @@ export function MovementNewPage() {
   const prefillAmount = Number.isSafeInteger(amountParam) && amountParam > 0 && amountParam <= 100_000_000 ? amountParam : undefined
   const prefillDescription = (params.get('concepto') ?? '').trim().slice(0, 200) || undefined
 
-  if (names.loading || !movements || !generalExpenses) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (names.loading || !movements || !generalExpenses || !totals) return <p className="text-sm text-muted-foreground">Cargando…</p>
   // Solo se usan ids que existen (nunca el texto crudo de la URL).
   const projectId = names.projects!.some((p) => p.id === projectParam) ? projectParam : ''
   const expense = generalExpenses.find((g) => g.id === expenseParam && g.active)
@@ -77,6 +83,14 @@ export function MovementNewPage() {
             initial={initial}
             submitLabel="Registrar movimiento"
             onCancel={() => navigate(back)}
+            distribution={
+              <DistributionForm
+                members={names.members!.filter((m) => m.active)}
+                fundCents={totals.fund}
+                onDone={() => navigate('/billetera', { replace: true })}
+                onCancel={() => navigate(back)}
+              />
+            }
             onSubmit={(data) => {
               try {
                 notifyWrite(api.createMovement(data, me), 'Movimiento registrado')

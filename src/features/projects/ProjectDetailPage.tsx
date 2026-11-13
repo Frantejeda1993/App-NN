@@ -1,23 +1,22 @@
-import { ArrowLeft, FileText, MessageCircle, Pencil } from 'lucide-react'
+import { ArrowLeft, FileText, Pencil } from 'lucide-react'
 import { ProjectMovements } from '@/features/wallet/ProjectMovements'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Badge, Card, Select } from '@/components/ui/form'
 import { useData, useMyEmail } from '@/data/DataProvider'
 import { useClient, useClients, useMembers, useQuotes, useWorkshopSettings } from '@/data/hooks'
 import type { Project } from '@/data/api'
 import { STATUS_LABELS as QUOTE_STATUS_LABELS } from '@/domain/quoteLifecycle'
 import { QUOTE_TONES, startQuote } from '@/features/quotes/shared'
-import { whatsappLink } from '@/domain/clients'
-import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
+import { formatDateEs, todayIso } from '@/domain/dates'
 import { formatEuros } from '@/domain/money'
 import { WORKSHOP_SHARE_KEY, formatPercent } from '@/domain/percent'
 import { isDeliveryOverdue } from '@/domain/projects'
-import { ContactForm } from '@/features/clients/ContactForm'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { PROJECT_STATUSES, ProjectDataSchema, type ProjectData, type ProjectStatus } from '@/model'
 import { useProject } from '@/data/hooks'
+import { ProjectContacts } from './ProjectContacts'
 import { ProjectForm } from './ProjectForm'
 import { STATUS_LABELS, STATUS_TONES, WORKSHOP_LABEL } from './labels'
 
@@ -71,7 +70,6 @@ export function ProjectDetailPage() {
 
   const memberName = (email: string) =>
     email === WORKSHOP_SHARE_KEY ? WORKSHOP_LABEL : (members?.find((m) => m.email === email)?.name ?? email)
-  const wa = client ? whatsappLink(client.phone) : null
   const overdue = isDeliveryOverdue(project, today)
 
   return (
@@ -101,6 +99,10 @@ export function ProjectDetailPage() {
             id="project-status"
             className="w-auto"
             value={project.status}
+            // Mientras se edita no se cambia el estado: guardaría al instante y
+            // el formulario se rechazaría como si otro socio lo hubiera cambiado.
+            disabled={editing}
+            title={editing ? 'Guardá o cancelá la edición para cambiar el estado' : undefined}
             onChange={(e) => changeStatus(e.target.value as ProjectStatus)}
           >
             {PROJECT_STATUSES.map((s) => (
@@ -179,38 +181,7 @@ export function ProjectDetailPage() {
         )}
       </Card>
 
-      {client && (
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Contacto con {client.name}</h2>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {client.lastContactAt ? `Último contacto ${relativeDays(client.lastContactAt, today)}` : 'Sin contactos'}
-              {wa && (
-                <a href={wa} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: 'sm', variant: 'outline' })}>
-                  <MessageCircle /> WhatsApp
-                </a>
-              )}
-            </div>
-          </div>
-          <ContactForm
-            onSubmit={(v) => {
-              try {
-                const res = api.addContact(
-                  client,
-                  { date: v.date, channel: v.channel, note: v.note, projectId: project.id },
-                  v.nextContactAt === '' ? null : v.nextContactAt,
-                  me,
-                )
-                notifyWrite(res, 'Contacto registrado')
-                return true
-              } catch (e) {
-                notifyError(e)
-                return false
-              }
-            }}
-          />
-        </Card>
-      )}
+      {client && <ProjectContacts client={client} projectId={project.id} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -241,6 +212,21 @@ function ProjectQuotes({ project }: { project: Project }) {
   const quotes = useQuotes()
   const settings = useWorkshopSettings()
   const mine = (quotes ?? []).filter((q) => q.projectId === project.id)
+  // Evita crear dos borradores con un doble click / Enter antes de navegar.
+  const busy = useRef(false)
+  const [creating, setCreating] = useState(false)
+  const create = () => {
+    if (!settings || busy.current) return
+    busy.current = true
+    setCreating(true)
+    try {
+      navigate(`/presupuestos/${startQuote(api, me, project, settings.settings)}`)
+    } catch (e) {
+      busy.current = false
+      setCreating(false)
+      notifyError(e)
+    }
+  }
   return (
     <>
       {quotes === undefined ? (
@@ -268,15 +254,8 @@ function ProjectQuotes({ project }: { project: Project }) {
       <Button
         className="mt-3"
         variant="outline"
-        disabled={!settings}
-        onClick={() => {
-          if (!settings) return
-          try {
-            navigate(`/presupuestos/${startQuote(api, me, project, settings.settings)}`)
-          } catch (e) {
-            notifyError(e)
-          }
-        }}
+        disabled={!settings || creating}
+        onClick={create}
       >
         Crear presupuesto
       </Button>

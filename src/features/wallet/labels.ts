@@ -8,6 +8,7 @@ export const TYPE_LABELS: Record<MovementType, string> = {
   aporte: 'Aporte de socio',
   transferencia: 'Transferencia',
   reintegro: 'Reintegro a socio',
+  reparto: 'Reparto del fondo del taller',
 }
 
 /** Tipos que se cargan desde el formulario (gasto general llega en el paso 6). */

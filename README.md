@@ -57,6 +57,7 @@ La app no tiene backend propio: **`firestore.rules` es la única barrera real**.
   - Cada alta, edición o baja sube la versión y escribe `auditLog/{id}_v{n}` con el estado anterior y el nuevo. Las reglas verifican que el registro coincida exactamente con el movimiento.
   - Si dos socios editan el mismo movimiento a la vez, el segundo recibe un error de conflicto.
 - **Presupuestos:** solo se borran los que están en borrador. Uno enviado no puede volver a borrador.
+- **Ediciones simultáneas:** presupuestos y proyectos llevan un contador `rev`; si otro socio guardó antes, el segundo guardado se rechaza en lugar de pisarlo.
 - **Dinero:** se guarda en céntimos enteros. Los porcentajes se guardan en puntos básicos (10000 = 100 %).
 
 Riesgos aceptados (equipo chico de socios de confianza):

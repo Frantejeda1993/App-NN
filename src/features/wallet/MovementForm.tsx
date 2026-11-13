@@ -1,11 +1,11 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import type { Box, GeneralExpense, Member, Project } from '@/data/api'
 import { todayIso } from '@/domain/dates'
 import { formatEuros, parseEuros } from '@/domain/money'
-import { MovementDataSchema, type MovementData, type MovementType } from '@/model'
+import { MEMBER_MOVEMENT_TYPES, MovementDataSchema, type MovementData, type MovementType } from '@/model'
 import { FORM_TYPES, TYPE_LABELS } from './labels'
 
 const toInput = (cents: number) => formatEuros(cents).replace(/\s?€/, '')
@@ -40,8 +40,14 @@ export interface MovementFormProps {
   generalExpenses?: GeneralExpense[]
   initial?: Partial<MovementData>
   submitLabel: string
+  /** Devuelve true si la escritura se inició (el botón queda bloqueado para no duplicarla). */
   onSubmit: (data: MovementData) => boolean
   onCancel?: () => void
+  /**
+   * Formulario del reparto del fondo del taller (habilita el tipo "reparto").
+   * Al elegirlo se muestra este formulario en lugar de los campos del movimiento.
+   */
+  distribution?: ReactNode
 }
 
 export function MovementForm({
@@ -54,7 +60,11 @@ export function MovementForm({
   submitLabel,
   onSubmit,
   onCancel,
+  distribution,
 }: MovementFormProps) {
+  // Doble clic / Enter: la navegación no desmonta al instante y se duplicaría el movimiento.
+  const submitting = useRef(false)
+  const [busy, setBusy] = useState(false)
   const [type, setType] = useState<MovementType>(initial?.type ?? 'cobro')
   const [generalExpenseId, setGeneralExpenseId] = useState(initial?.generalExpenseId ?? '')
   // Lo que la app completó a partir del gasto general elegido (ver chooseGeneralExpense).
@@ -87,14 +97,19 @@ export function MovementForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const isExpense = type === 'gasto_proyecto' || type === 'gasto_general'
-  const usesMember = type === 'retiro' || type === 'aporte' || type === 'reintegro'
+  const usesMember = MEMBER_MOVEMENT_TYPES.includes(type)
+  // El reparto del fondo del taller no mueve dinero de las cajas.
+  const usesMemberBox = usesMember && type !== 'reparto'
   const activeBoxes = boxes.filter((b) => b.active || b.id === initial?.boxId || b.id === initial?.toBoxId)
   const activeMembers = members.filter((m) => m.active || m.email === initial?.paidBy || m.email === initial?.memberEmail)
   const keepProjects = new Set([initial?.projectId, ...(initial?.projectSplits ?? []).map((s) => s.projectId)])
   const selectableProjects = projects.filter((p) => p.status !== 'archivado' || keepProjects.has(p.id))
   const selectableExpenses = generalExpenses.filter((g) => g.active || g.id === initial?.generalExpenseId)
-  const types: MovementType[] =
-    selectableExpenses.length > 0 || initial?.type === 'gasto_general' ? [...FORM_TYPES, 'gasto_general'] : FORM_TYPES
+  const types: MovementType[] = [
+    ...FORM_TYPES,
+    ...(selectableExpenses.length > 0 || initial?.type === 'gasto_general' ? (['gasto_general'] as const) : []),
+    ...(distribution || initial?.type === 'reparto' ? (['reparto'] as const) : []),
+  ]
 
   /**
    * Al elegir un gasto general se completan importe, categoría y descripción.
@@ -127,7 +142,7 @@ export function MovementForm({
     }
 
     // Un gasto usa caja solo si ya se pagó desde una caja; el resto de tipos siempre.
-    const usesBox = isExpense ? !pending && payer === 'box' : true
+    const usesBox = isExpense ? !pending && payer === 'box' : type !== 'reparto'
     const data = {
       type,
       status: isExpense && pending ? 'pendiente_pago' : 'pagado',
@@ -154,8 +169,13 @@ export function MovementForm({
       }
     }
     setErrors(errs)
-    if (Object.keys(errs).length > 0 || !parsed.success) return
-    onSubmit(parsed.data)
+    if (Object.keys(errs).length > 0 || !parsed.success || submitting.current) return
+    submitting.current = true
+    setBusy(true)
+    if (!onSubmit(parsed.data)) {
+      submitting.current = false
+      setBusy(false)
+    }
   }
 
   const boxSelect = (id: string, label: string, value: string, set: (v: string) => void, error?: string) => (
@@ -182,17 +202,31 @@ export function MovementForm({
     </>
   )
 
+  const typeField = (
+    <Field id="mv-type" label="Tipo de movimiento" className="md:col-span-2">
+      <Select id="mv-type" value={type} onChange={(e) => setType(e.target.value as MovementType)}>
+        {types.map((t) => (
+          <option key={t} value={t}>
+            {TYPE_LABELS[t]}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  )
+
+  // El reparto entre socios es su propio formulario (calcula las partes iguales).
+  if (type === 'reparto' && distribution) {
+    return (
+      <div className="flex flex-col gap-4">
+        {typeField}
+        {distribution}
+      </div>
+    )
+  }
+
   return (
     <form noValidate onSubmit={submit} className="grid gap-4 md:grid-cols-2">
-      <Field id="mv-type" label="Tipo de movimiento" className="md:col-span-2">
-        <Select id="mv-type" value={type} onChange={(e) => setType(e.target.value as MovementType)}>
-          {types.map((t) => (
-            <option key={t} value={t}>
-              {TYPE_LABELS[t]}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      {typeField}
 
       {type === 'gasto_general' && (
         <Field id="mv-general" label="Gasto general *" error={errors.generalExpenseId} className="md:col-span-2">
@@ -354,7 +388,7 @@ export function MovementForm({
               ))}
             </Select>
           </Field>
-          {boxSelect('mv-box', 'Caja *', boxId, setBoxId, errors.boxId)}
+          {usesMemberBox && boxSelect('mv-box', 'Caja *', boxId, setBoxId, errors.boxId)}
         </>
       )}
 
@@ -381,7 +415,9 @@ export function MovementForm({
         ))}
 
       <div className="flex gap-2 md:col-span-2">
-        <Button type="submit">{submitLabel}</Button>
+        <Button type="submit" disabled={busy}>
+          {submitLabel}
+        </Button>
         {onCancel && (
           <Button variant="outline" onClick={onCancel}>
             Cancelar

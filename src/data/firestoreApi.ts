@@ -26,6 +26,7 @@ import {
   MemberDataSchema,
   MovementBaseSchema,
   MovementControlSchema,
+  OpeningBalancesSchema,
   ProjectDataSchema,
   QuoteDataSchema,
   SETTINGS_DOCS,
@@ -34,8 +35,19 @@ import {
   type Stored,
   UserPrefsSchema,
 } from '@/model'
+import { distributionMovements } from '@/domain/distribution'
 import { byCreatedDesc, byDateDesc, byMovementDesc, byName, type DataApi } from './api'
-import { addContact, createDocument, createMovement, deleteMovement, updateDocument, updateMovement } from './repo'
+import {
+  addContact,
+  createDocument,
+  createMovement,
+  createMovements,
+  deleteMovement,
+  updateDocument,
+  updateMovement,
+  updateWithRev,
+  type RevUpdate,
+} from './repo'
 
 const StoredMovementSchema = MovementBaseSchema.extend(MovementControlSchema.shape)
 
@@ -73,6 +85,19 @@ const onError = (what: string) => (err: Error) => {
       ? `Sin acceso a ${what}. Si te desactivaron como socio, pedí que te vuelvan a habilitar.`
       : `No se pudieron cargar ${what}. Revisá la conexión y recargá.`,
     { id: `read-error-${what}` },
+  )
+}
+
+/**
+ * Un documento ilegible queda fuera de listas y saldos: se avisa en pantalla
+ * (sin valores, solo cuántos) para que se corrija en la consola.
+ */
+function warnUnreadable(total: number, read: number, what: string, effect: string) {
+  const n = total - read
+  if (n <= 0) return
+  toast.warning(
+    `${n} ${what} con datos inválidos no se ${n > 1 ? 'muestran' : 'muestra'}${effect}. Revisalos en la consola de Firebase.`,
+    { id: `unreadable-${what}`, duration: Infinity },
   )
 }
 
@@ -158,6 +183,8 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
         collection(db, COLLECTIONS.projects),
         (snap) => {
           const list = snap.docs.map((d) => toStored(ProjectDataSchema, d)).filter((p) => p !== null)
+          // Un proyecto ilegible haría que su ganancia vaya entera al taller en el panel.
+          warnUnreadable(snap.size, list.length, 'proyecto(s)', ' (su ganancia se asigna al taller)')
           cb(list.sort(byCreatedDesc))
         },
         onError('proyectos'),
@@ -187,7 +214,11 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
     watchQuotes(cb) {
       return onSnapshot(
         collection(db, COLLECTIONS.quotes),
-        (snap) => cb(snap.docs.map((d) => toStored(QuoteDataSchema, d)).filter((q) => q !== null).sort(byCreatedDesc)),
+        (snap) => {
+          const list = snap.docs.map((d) => toStored(QuoteDataSchema, d)).filter((q) => q !== null)
+          warnUnreadable(snap.size, list.length, 'presupuesto(s)', ' ni cuentan en el panel')
+          cb(list.sort(byCreatedDesc))
+        },
         onError('presupuestos'),
       )
     },
@@ -197,7 +228,11 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
     },
 
     createQuote: (input, by) => createDocument(db, COLLECTIONS.quotes, QuoteDataSchema, input, by),
-    updateQuote: (id, next, by) => updateDocument(db, COLLECTIONS.quotes, id, QuoteDataSchema, next, by),
+    updateQuote(id, next, by, project) {
+      const updates: RevUpdate<z.ZodType>[] = [{ collectionPath: COLLECTIONS.quotes, id, schema: QuoteDataSchema, next }]
+      if (project) updates.push({ collectionPath: COLLECTIONS.projects, id: project.id, schema: ProjectDataSchema, next: project.next })
+      return updateWithRev(db, by, updates)
+    },
     deleteQuote(id) {
       const committed = deleteDoc(doc(db, COLLECTIONS.quotes, id))
       committed.catch(() => {})
@@ -267,6 +302,10 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
       return createMovement(db, input, by)
     },
 
+    createDistribution(input, by) {
+      return createMovements(db, distributionMovements(input), by)
+    },
+
     updateMovement(current, next, by) {
       return updateMovement(db, current, next, by)
     },
@@ -280,7 +319,7 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
     },
 
     updateProject(id, next, by) {
-      return updateDocument(db, COLLECTIONS.projects, id, ProjectDataSchema, next, by)
+      return updateWithRev(db, by, [{ collectionPath: COLLECTIONS.projects, id, schema: ProjectDataSchema, next }])
     },
 
     createClient(input, by) {
@@ -353,6 +392,29 @@ export function createFirestoreDataApi(db: Firestore): DataApi {
       return exists
         ? updateDocument(db, COLLECTIONS.settings, SETTINGS_DOCS.workshop, WorkshopSettingsSchema, next, by)
         : createDocument(db, COLLECTIONS.settings, WorkshopSettingsSchema, next, by, SETTINGS_DOCS.workshop)
+    },
+
+    watchOpeningBalances(cb) {
+      return onSnapshot(
+        doc(db, COLLECTIONS.settings, SETTINGS_DOCS.opening),
+        (snap) => {
+          const parsed = OpeningBalancesSchema.safeParse(snap.data() ?? {})
+          if (snap.exists() && !parsed.success) {
+            toast.warning('La configuración inicial de la billetera tiene datos inválidos y no se está usando.', {
+              id: 'unreadable-opening',
+              duration: Infinity,
+            })
+          }
+          cb({ opening: parsed.success ? parsed.data : OpeningBalancesSchema.parse({}), exists: snap.exists() })
+        },
+        onError('configuración inicial'),
+      )
+    },
+
+    saveOpeningBalances(next, exists, by) {
+      return exists
+        ? updateDocument(db, COLLECTIONS.settings, SETTINGS_DOCS.opening, OpeningBalancesSchema, next, by)
+        : createDocument(db, COLLECTIONS.settings, OpeningBalancesSchema, next, by, SETTINGS_DOCS.opening)
     },
   }
 }

@@ -1,57 +1,36 @@
-import { AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { AlertTriangle, CheckCircle2, HandCoins } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/form'
-import { useBoxes, useGeneralExpenses, useMembers, useMovements, useProjects, useQuotes } from '@/data/hooks'
-import { allocations, futureIncome, pendingExpenses, projectCollection } from '@/domain/dashboard'
 import { formatEuros } from '@/domain/money'
 import { WORKSHOP_SHARE_KEY } from '@/domain/percent'
-import { boxBalances } from '@/domain/wallet'
 import { WORKSHOP_LABEL } from '@/features/projects/labels'
 import { cn } from '@/lib/utils'
+import { useWalletTotals } from './useWalletTotals'
 
 const money = (c: number) => formatEuros(c)
 
 export function DashboardTab() {
-  const boxes = useBoxes()
-  const members = useMembers()
-  const projects = useProjects()
-  const generalExpenses = useGeneralExpenses()
-  const movements = useMovements()
-  const quotes = useQuotes()
-
-  const data = useMemo(() => {
-    if (!boxes || !members || !projects || !generalExpenses || !movements || !quotes) return null
-    const balances = boxBalances(movements, boxes.map((b) => b.id))
-    const cash = Object.values(balances).reduce((s, v) => s + v, 0)
-    const pending = pendingExpenses(movements)
-    const alloc = allocations({
-      members: members.filter((m) => m.active).map((m) => m.email),
-      projects,
-      generalExpenses,
-      movements,
-      quotes,
-    })
-    const debts = Object.entries(alloc)
-      .filter(([k]) => k !== WORKSHOP_SHARE_KEY)
-      .reduce((s, [, a]) => s + Math.max(0, a.debt), 0)
-    const sumTotals = Object.values(alloc).reduce((s, a) => s + a.total, 0)
-    const closed = new Set(projects.filter((p) => p.status === 'archivado' || p.status === 'cancelado').map((p) => p.id))
-    const future = futureIncome(quotes, movements, closed)
-    const visible = projects.filter((p) => !closed.has(p.id))
-    const collection = projectCollection(visible, quotes, movements).filter((r) => r.budgetCents > 0 || r.collectedCents > 0)
-    return { balances, cash, pending, alloc, debts, sumTotals, future, collection }
-  }, [boxes, members, projects, generalExpenses, movements, quotes])
-
+  const data = useWalletTotals()
   if (!data) return <p className="text-sm text-muted-foreground">Cargando…</p>
 
-  const name = (k: string) => (k === WORKSHOP_SHARE_KEY ? WORKSHOP_LABEL : (members!.find((m) => m.email === k)?.name ?? k))
-  const projectTitle = (id: string) => projects!.find((p) => p.id === id)?.title ?? id
+  const name = (k: string) => (k === WORKSHOP_SHARE_KEY ? WORKSHOP_LABEL : (data.members.find((m) => m.email === k)?.name ?? k))
+  const projectTitle = (id: string) => data.projects.find((p) => p.id === id)?.title ?? id
   const rows = Object.entries(data.alloc).sort(([a], [b]) => (a === WORKSHOP_SHARE_KEY ? 1 : b === WORKSHOP_SHARE_KEY ? -1 : 0))
   const squares = data.sumTotals === data.cash - data.pending
 
   return (
     <div className="flex flex-col gap-4">
+      {!data.openingExists && (
+        <Card className="text-sm">
+          ¿Ya tenían dinero y cuentas antes de empezar a usar la app?{' '}
+          <Link to="/billetera?tab=inicial" className="text-primary underline">
+            Cargá la configuración inicial
+          </Link>{' '}
+          para que los saldos arranquen desde ahí.
+        </Card>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi label="Dinero en cajas" value={money(data.cash)} />
         <Kpi label="Gastos pendientes de pago" value={money(data.pending)} tone={data.pending > 0 ? 'warning' : undefined} />
@@ -64,19 +43,28 @@ export function DashboardTab() {
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Kpi label="Por cobrar de presupuestos aceptados" value={money(data.future.acceptedCents)} />
         <Kpi label="Presupuestos enviados (sin respuesta)" value={money(data.future.sentCents)} />
+        <Card>
+          <p className="text-xs text-muted-foreground">Fondo común del taller</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">{money(data.fund)}</p>
+          {data.fund > 0 && (
+            <Link to="/billetera/nuevo?tipo=reparto" className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'mt-2')}>
+              <HandCoins /> Repartir entre socios
+            </Link>
+          )}
+        </Card>
       </div>
 
       <Card>
         <h2 className="mb-1 font-semibold">Lo que le corresponde a cada uno</h2>
         <p className="mb-3 text-xs text-muted-foreground">
-          Ganancia de proyectos (cobros − gastos, incluidos los pendientes) según la participación − gastos generales según su
-          reparto + aportes − retiros + lo que el taller le debe.
+          Saldo inicial + ganancia de proyectos (cobros − gastos, incluidos los pendientes) según la participación − gastos
+          generales según su reparto + aportes − retiros + lo que el taller le debe + lo repartido del fondo del taller.
         </p>
         <div className="overflow-x-auto">
-          <table aria-label="Reparto por socio" className="w-full min-w-[640px] text-sm">
+          <table aria-label="Reparto por socio" className="w-full min-w-[720px] text-sm">
             <thead className="text-left text-xs text-muted-foreground">
               <tr>
                 <th className="py-2 pr-2 font-medium">Socio</th>
@@ -85,6 +73,7 @@ export function DashboardTab() {
                 <th className="px-2 text-right font-medium">Aportes</th>
                 <th className="px-2 text-right font-medium">Retiros</th>
                 <th className="px-2 text-right font-medium">Le debe el taller</th>
+                <th className="px-2 text-right font-medium">Fondo del taller</th>
                 <th className="pl-2 text-right font-medium">Le corresponde</th>
               </tr>
             </thead>
@@ -99,6 +88,7 @@ export function DashboardTab() {
                   <Cell v={a.aportes} />
                   <Cell v={-a.retiros} />
                   <Cell v={a.debt} />
+                  <Cell v={a.reparto} />
                   <td className={cn('pl-2 text-right font-semibold', a.total < 0 && 'text-destructive')}>{money(a.total || 0)}</td>
                 </tr>
               ))}
@@ -111,7 +101,8 @@ export function DashboardTab() {
         >
           {squares ? <CheckCircle2 className="size-4 text-emerald-600" /> : <AlertTriangle className="size-4" />}
           Suma de todos: {money(data.sumTotals)} = cajas {money(data.cash)} − pendientes {money(data.pending)}
-          {!squares && ' (no cuadra: hay movimientos o proyectos que no se pudieron leer; revisá los avisos)'}
+          {!squares &&
+            ' (no cuadra: revisá la configuración inicial o los avisos de movimientos/proyectos que no se pudieron leer)'}
         </p>
       </Card>
 
@@ -159,7 +150,7 @@ export function DashboardTab() {
       <Card>
         <h2 className="mb-2 font-semibold">Saldo por caja</h2>
         <ul aria-label="Saldo por caja" className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-          {boxes!.map((b) => (
+          {data.boxes.map((b) => (
             <li key={b.id} className={cn(!b.active && 'opacity-60')}>
               {b.name}: <span className="font-medium tabular-nums">{money(data.balances[b.id])}</span>
             </li>

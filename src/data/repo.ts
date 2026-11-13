@@ -7,6 +7,7 @@ import {
   writeBatch,
   type FieldValue,
   type Firestore,
+  type WriteBatch,
 } from 'firebase/firestore'
 import type { z } from 'zod'
 import {
@@ -84,6 +85,28 @@ export function updateDocument<S extends z.ZodType>(
   return result(id, updateDoc(doc(db, collectionPath, id), { ...data, ...auditOnUpdate(by) }))
 }
 
+/** Una escritura con concurrencia optimista: `next.rev` es la versión que se estaba viendo. */
+export interface RevUpdate<S extends z.ZodType> {
+  collectionPath: string
+  id: string
+  schema: S
+  next: z.output<S> & { rev: number }
+}
+
+/**
+ * Actualiza uno o más documentos con contador `rev` en un solo lote: cada uno se
+ * escribe con rev + 1 y las reglas lo rechazan si en el servidor ya no es `rev`
+ * (otro socio guardó antes). Todo o nada.
+ */
+export function updateWithRev(db: Firestore, by: string, updates: RevUpdate<z.ZodType>[]): WriteResult {
+  const batch = writeBatch(db)
+  for (const u of updates) {
+    const data = u.schema.parse(u.next) as Record<string, unknown>
+    batch.update(doc(db, u.collectionPath, u.id), { ...data, rev: u.next.rev + 1, ...auditOnUpdate(by) })
+  }
+  return result(updates[0].id, batch.commit())
+}
+
 // ---- Contactos con clientes ----------------------------------------------------
 
 /**
@@ -139,6 +162,20 @@ function writeMovementVersion(
   by: string,
 ): WriteResult {
   const batch = writeBatch(db)
+  addMovementVersion(batch, db, id, action, before, after, by)
+  return result(id, batch.commit())
+}
+
+/** Agrega al lote el movimiento y su entrada de auditLog. */
+function addMovementVersion(
+  batch: WriteBatch,
+  db: Firestore,
+  id: string,
+  action: 'create' | 'update' | 'delete',
+  before: (MovementData & MovementControl) | null,
+  after: MovementData & MovementControl,
+  by: string,
+) {
   const ref = doc(db, COLLECTIONS.movements, id)
   if (action === 'create') batch.set(ref, { ...after, ...auditOnCreate(by) })
   else batch.update(ref, { ...after, ...auditOnUpdate(by) })
@@ -152,13 +189,28 @@ function writeMovementVersion(
     by,
     at: serverTimestamp(),
   })
-  return result(id, batch.commit())
 }
 
 export function createMovement(db: Firestore, input: z.input<typeof MovementDataSchema>, by: string): WriteResult {
   const data = MovementDataSchema.parse(input)
   const id = doc(collection(db, COLLECTIONS.movements)).id
   return writeMovementVersion(db, id, 'create', null, { ...data, version: 1, deleted: false, deletedReason: '' }, by)
+}
+
+/**
+ * Varios movimientos (con su auditLog) en un solo lote: se registran todos o
+ * ninguno. Se usa para el reparto del fondo del taller (uno por socio).
+ */
+export function createMovements(db: Firestore, inputs: z.input<typeof MovementDataSchema>[], by: string): WriteResult {
+  if (inputs.length === 0) throw new Error('No hay movimientos para registrar')
+  const parsed = inputs.map((i) => MovementDataSchema.parse(i))
+  const batch = writeBatch(db)
+  const ids = parsed.map((data) => {
+    const id = doc(collection(db, COLLECTIONS.movements)).id
+    addMovementVersion(batch, db, id, 'create', null, { ...data, version: 1, deleted: false, deletedReason: '' }, by)
+    return id
+  })
+  return result(ids[0], batch.commit())
 }
 
 /**
@@ -178,10 +230,12 @@ export function updateMovement(
   return writeMovementVersion(db, current.id, 'update', before, after, by)
 }
 
-/** Baja lógica: queda marcado como eliminado (y auditado), no desaparece. */
+/** Baja lógica: queda marcado como eliminado (y auditado), no desaparece. El motivo es obligatorio. */
 export function deleteMovement(db: Firestore, current: StoredMovement, reason: string, by: string): WriteResult {
   if (current.deleted) throw new Error('El movimiento ya está eliminado')
+  const deletedReason = reason.trim().slice(0, 500)
+  if (!deletedReason) throw new Error('Escribí el motivo de la baja')
   const before = pickMovement(current)
-  const after = { ...before, version: current.version + 1, deleted: true, deletedReason: reason.trim().slice(0, 500) }
+  const after = { ...before, version: current.version + 1, deleted: true, deletedReason }
   return writeMovementVersion(db, current.id, 'delete', before, after, by)
 }

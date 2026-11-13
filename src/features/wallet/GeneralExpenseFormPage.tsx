@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, Field, Input, Select, Textarea } from '@/components/ui/form'
@@ -62,6 +62,9 @@ function Form({
   const api = useData()
   const me = useMyEmail()
   const navigate = useNavigate()
+  // Evita guardar dos veces con doble clic / Enter (la navegación no desmonta al instante).
+  const submitting = useRef(false)
+  const [busy, setBusy] = useState(false)
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState(existing?.category ?? (kind === 'fijo' ? 'Taller' : 'Herramientas'))
   const [amount, setAmount] = useState(existing ? toInput(existing.amountCents) : '')
@@ -92,6 +95,9 @@ function Form({
     if (!parsed.success) for (const i of parsed.error.issues) errs[String(i.path[0] ?? 'form')] ??= i.message
     setErrors(errs)
     if (Object.keys(errs).length > 0 || !parsed.success) return
+    if (submitting.current) return
+    submitting.current = true
+    setBusy(true)
 
     try {
       if (existing) {
@@ -104,6 +110,8 @@ function Form({
         navigate(kind === 'esporadico' ? payLink(res.id) : back, { replace: true })
       }
     } catch (err) {
+      submitting.current = false
+      setBusy(false)
       notifyError(err)
     }
   }
@@ -164,7 +172,7 @@ function Form({
             )}
           </div>
           <div className="flex gap-2 md:col-span-2">
-            <Button type="submit">
+            <Button type="submit" disabled={busy}>
               {existing ? 'Guardar cambios' : kind === 'esporadico' ? 'Crear y registrar pago' : 'Crear gasto fijo'}
             </Button>
             <Button variant="outline" onClick={() => navigate(back)}>

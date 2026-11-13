@@ -60,6 +60,8 @@ export function defaultSharesFor(
     const keys = Object.keys(configured)
     if (keys.every((k) => k === WORKSHOP_SHARE_KEY || active.includes(k))) return { ...configured }
   }
+  // Sin socios activos todo va al taller (un reparto siempre suma 100 %).
+  if (active.length === 0) return { [WORKSHOP_SHARE_KEY]: FULL_SHARE_BP }
   const equal = allocateByWeights(FULL_SHARE_BP, Object.fromEntries(active.map((e) => [e, 1])))
   return { ...equal, [WORKSHOP_SHARE_KEY]: 0 }
 }

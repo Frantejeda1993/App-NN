@@ -7,6 +7,7 @@ import {
   nonNegativeCentsSchema,
   nullableId,
   nullableIsoDate,
+  revSchema,
   textSchema,
 } from './common'
 
@@ -142,5 +143,7 @@ export const QuoteDataSchema = z.object({
       acceptedTotalCents: centsSchema.default(0),
     })
     .default({ subtotalCents: 0, totalCents: 0, acceptedTotalCents: 0 }),
+  /** Contador de escrituras: las reglas exigen +1 (si otro socio guardó antes, se rechaza). */
+  rev: revSchema,
 })
 export type QuoteData = z.infer<typeof QuoteDataSchema>
