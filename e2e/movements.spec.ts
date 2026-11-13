@@ -32,8 +32,8 @@ test('un movimiento se edita con historial y se elimina con motivo sin perderse'
   await page.getByRole('button', { name: /^eliminar$/i }).last().click()
   await expect(page.getByText(/motivo de la baja/i)).toBeVisible()
   await expect(history).toContainText(/cargado dos veces/i)
-  const stored = await readDoc(`movements/${id}`)
-  expect(stored?.deleted).toEqual({ booleanValue: true })
+  // La pantalla se actualiza con la escritura local; el servidor la confirma un instante después.
+  await expect.poll(async () => (await readDoc(`movements/${id}`))?.deleted).toEqual({ booleanValue: true })
 
   // Fuera de los saldos y de la lista (salvo "mostrar eliminados")
   await page.goto('/#/billetera')

@@ -1,7 +1,7 @@
 # Graph Report - App NN  (2026-11-13)
 
 ## Corpus Check
-- 166 files · ~86,891 words
+- 166 files · ~86,946 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 7 file(s) not represented in the graph (top: (none) 3, .example 1, .rules 1)
 
@@ -88,8 +88,8 @@
   SECURITY.md → src/data/repo.ts
 - `Dinero en centimos enteros y porcentajes en puntos basicos` --references--> `allocateByWeights()`  [EXTRACTED]
   CLAUDE.md → src/domain/percent.ts
-- `firestore.rules as the only real security barrier` --semantically_similar_to--> `Firebase Spark without Cloud Functions: all logic client-side, security via rules`  [INFERRED] [semantically similar]
-  README.md → docs/plan.md
+- `Apple Touch Icon 180x180 (iOS home-screen icon, split black/walnut N mark)` --semantically_similar_to--> `In-App Logo (faceted N: black slate and walnut wood pieces)`  [INFERRED] [semantically similar]
+  public/apple-touch-icon-180x180.png → src/assets/logo.png
 
 ## Import Cycles
 - None detected.
@@ -313,38 +313,38 @@ Cohesion: 0.40
 Nodes (4): HARDWARE_KIND_LABELS, HARDWARE_UNIT_LABELS, HARDWARE_KINDS, HARDWARE_UNITS
 
 ## Ambiguous Edges - Review These
-- `cspPlugin()` → `Content-Security-Policy por <meta> (cspPlugin)`  [AMBIGUOUS]
-  SECURITY.md · relation: references
 - `DataApi` → `src/data: DataApi, firestoreApi, repo, hooks`  [AMBIGUOUS]
   CLAUDE.md · relation: references
+- `cspPlugin()` → `Content-Security-Policy por <meta> (cspPlugin)`  [AMBIGUOUS]
+  SECURITY.md · relation: references
 - `firebase.ts` → `Login falso de desarrollo solo con import.meta.env.DEV`  [AMBIGUOUS]
   SECURITY.md · relation: references
 - `dashboard.ts` → `Panel de la billetera`  [AMBIGUOUS]
   CLAUDE.md · relation: references
 
 ## Knowledge Gaps
-- **16 isolated node(s):** `index.html SPA entry (root div, loads /src/main.tsx)`, `Contact alerts (nextContactAt overdue / N days) + WhatsApp button`, `Quote totals: accepted items + free lines + justified adjustments; optional VAT`, `PDF generation in browser with @react-pdf/renderer`, `Step 12: Playwright e2e of main flow (login to wallet)` (+11 more)
+- **16 isolated node(s):** `index.html SPA entry (root div, loads /src/main.tsx)`, `Contact alerts (nextContactAt overdue / N days) + WhatsApp button`, `Quote totals: accepted items + free lines + justified adjustments; optional VAT`, `Money in integer cents; percentages in basis points (10000 = 100%)`, `Quotes: only drafts deletable; sent cannot return to draft` (+11 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 383 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `FakeDataApi` connect `FakeDataApi` to `dates.ts`, `Tests de pantallas`, `.seedClient`, `Escrituras de DataApi`, `api.ts`, `Seguridad de Taller NN`?**
-  _High betweenness centrality (0.130) - this node is a cross-community bridge._
+- **Why does `vitest` connect `Tests de pantallas` to `generalExpenses.ts`, `dashboard.ts`, `quotePdf.ts`, `devDependencies`, `Tests e2e (Playwright)`, `Esquemas zod y auditoría`, `Capa Firestore`, `projects.ts`, `Geometría 3D de muebles`, `api.ts`, `main.tsx`, `shopping.ts`, `domain/catalog.ts`, `shared.ts`, `quote.ts`, `Build con Vite y PWA`, `package.json`, `dates.ts`, `clients.ts`, `money.test.ts`?**
+  _High betweenness centrality (0.085) - this node is a cross-community bridge._
 - **What connects `index.html SPA entry (root div, loads /src/main.tsx)`, `Contact alerts (nextContactAt overdue / N days) + WhatsApp button`, `Quote totals: accepted items + free lines + justified adjustments; optional VAT` to the rest of the system?**
   _16 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `QuoteEditorPage.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.12903225806451613 - nodes in this community are weakly interconnected._
-- **Why does `DataApi` connect `Escrituras de DataApi` to `hooks.ts`, `FakeDataApi`, `MovementForm.tsx`, `Capa Firestore`, `api.ts`, `Seguridad de Taller NN`, `domain/catalog.ts`, `shared.ts`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
+- **Why does `@playwright/test` connect `Tests e2e (Playwright)` to `package.json`, `devDependencies`?**
+  _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **Should `hooks.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.052857414087715965 - nodes in this community are weakly interconnected._
 
 ### Low-confidence Hints
 _AMBIGUOUS edges — the extractor was unsure. Verify before acting on these._
 
-- **What is the exact relationship between `cspPlugin()` and `Content-Security-Policy por <meta> (cspPlugin)`?**
-  _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
 - **What is the exact relationship between `DataApi` and `src/data: DataApi, firestoreApi, repo, hooks`?**
+  _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
+- **What is the exact relationship between `cspPlugin()` and `Content-Security-Policy por <meta> (cspPlugin)`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._

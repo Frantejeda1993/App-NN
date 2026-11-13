@@ -30,10 +30,10 @@
     "semantic_hash": "258bae1625a6cc24404ecd468a05e035"
   },
   "e2e/movements.spec.ts": {
-    "mtime": 1794579133.283745,
-    "seen": 1794579667.5152063,
-    "ast_hash": "72089d415ed054930d5e5a39825ea76e",
-    "semantic_hash": "72089d415ed054930d5e5a39825ea76e"
+    "mtime": 1794586167.8874102,
+    "seen": 1794586597.134439,
+    "ast_hash": "cabbdecac477bcb5a97937f0a7d639d8",
+    "semantic_hash": ""
   },
   "e2e/shopping-pdf.spec.ts": {
     "mtime": 1794579133.288319,
@@ -168,9 +168,9 @@
     "semantic_hash": ""
   },
   "src/components/ui/form.tsx": {
-    "mtime": 1794584393.7375586,
-    "seen": 1794585075.153607,
-    "ast_hash": "d0f7398a96617c79da668c57cdd09758",
+    "mtime": 1794586167.731162,
+    "seen": 1794586597.1346548,
+    "ast_hash": "8affc4eb194344f7e4f0e33fdd50b8df",
     "semantic_hash": ""
   },
   "src/components/ui/money-input.tsx": {
@@ -582,9 +582,9 @@
     "semantic_hash": "8722fd531534d3b5df210b4a25557f51"
   },
   "src/features/quotes/QuoteEditorPage.tsx": {
-    "mtime": 1794584291.4426398,
-    "seen": 1794585075.1538975,
-    "ast_hash": "1f2157be954da8fc76da55d23f4996cb",
+    "mtime": 1794586251.4954922,
+    "seen": 1794586597.1353002,
+    "ast_hash": "6b8ecaf5072318bbaa87592e2886b6c5",
     "semantic_hash": ""
   },
   "src/features/quotes/QuoteItemDialog.tsx": {

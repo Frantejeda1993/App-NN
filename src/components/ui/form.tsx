@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils'
 
 /** Campos: 44 px de alto en celular (táctil) y 40 px en pantalla; 16 px de letra en celular (sin zoom en iOS). */
 const control = [
-  'w-full rounded-lg border border-input bg-card px-3 py-2 text-base text-foreground shadow-xs md:text-sm',
+  // min-w-0 + max-w-full: un selector con opciones largas nunca ensancha la página (desborde en celular).
+  'w-full min-w-0 max-w-full rounded-lg border border-input bg-card px-3 py-2 text-base text-foreground shadow-xs md:text-sm',
   'transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground',
   'hover:border-primary/40 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/25',
   'disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60',

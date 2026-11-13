@@ -498,11 +498,12 @@ function Editor({
                 )}
               </div>
               {editable && (
-                <div className="flex flex-wrap gap-2">
+                // En el celular ocupa el ancho disponible: un nombre de plantilla largo no ensancha la página.
+                <div className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto">
                   {templates.length > 0 && (
                     <Select
                       aria-label="Agregar desde plantilla"
-                      className="w-auto"
+                      className="w-full sm:w-auto"
                       value=""
                       onChange={(e) => {
                         const t = templates.find((x) => x.id === e.target.value)
