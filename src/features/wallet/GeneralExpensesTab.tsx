@@ -14,6 +14,7 @@ import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { GeneralExpenseDataSchema } from '@/model'
 import { FIXED_STATUS_LABELS, payLink } from './generalExpenseLinks'
+import { Loading } from '@/components/ui/loading'
 
 export function GeneralExpensesTab() {
   const api = useData()
@@ -28,7 +29,7 @@ export function GeneralExpensesTab() {
     return (k: string) => (k === WORKSHOP_SHARE_KEY ? WORKSHOP_LABEL : (map.get(k) ?? k))
   }, [members])
 
-  if (!expenses || !movements || !members) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!expenses || !movements || !members) return <Loading />
 
   const fixed = expenses.filter((g) => g.kind === 'fijo')
   const sporadic = expenses.filter((g) => g.kind === 'esporadico')

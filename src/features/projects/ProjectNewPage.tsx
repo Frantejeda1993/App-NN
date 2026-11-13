@@ -7,6 +7,7 @@ import { todayIso } from '@/domain/dates'
 import { defaultSharesFor } from '@/domain/projects'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { ProjectForm } from './ProjectForm'
+import { Loading } from '@/components/ui/loading'
 
 export function ProjectNewPage() {
   const api = useData()
@@ -18,7 +19,7 @@ export function ProjectNewPage() {
   const settings = useWorkshopSettings()
   const preselected = params.get('cliente') ?? ''
 
-  if (!clients || !members || !settings) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!clients || !members || !settings) return <Loading />
 
   return (
     <section className="flex max-w-3xl flex-col gap-4">

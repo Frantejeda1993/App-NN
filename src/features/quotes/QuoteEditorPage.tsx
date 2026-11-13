@@ -41,6 +41,7 @@ import { QuoteItemRow } from './QuoteItemRow'
 import { AdjustmentsEditor, FreeLinesEditor, QuoteSummary } from './QuoteParts'
 import { ShoppingListCard } from './ShoppingListCard'
 import { QUOTE_TONES, useQuoteCatalog } from './shared'
+import { Loading } from '@/components/ui/loading'
 
 const back = '/presupuestos'
 
@@ -86,7 +87,7 @@ export function QuoteEditorPage() {
   const settings = useWorkshopSettings()
 
   if (quote === undefined || !quotes || !catalog || !projects || !clients || !templates || !settings) {
-    return <p className="text-sm text-muted-foreground">Cargando…</p>
+    return <Loading />
   }
   if (quote === null) {
     return (

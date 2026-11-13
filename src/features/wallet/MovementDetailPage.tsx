@@ -15,6 +15,7 @@ import { Amount } from './Amount'
 import { MovementForm } from './MovementForm'
 import { ACTION_LABELS, FIELD_LABELS, TYPE_LABELS } from './labels'
 import { useWalletNames } from './useWalletNames'
+import { Loading } from '@/components/ui/loading'
 
 type Mode = 'view' | 'edit' | 'delete' | 'pay'
 
@@ -37,7 +38,7 @@ export function MovementDetailPage() {
   const movement = movements?.find((m) => m.id === id)
   const debts = useMemo(() => memberDebts(movements ?? []), [movements])
 
-  if (!movements || names.loading || !generalExpenses) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!movements || names.loading || !generalExpenses) return <Loading />
   if (!movement) {
     return (
       <section className="flex flex-col gap-3">
@@ -271,7 +272,7 @@ export function MovementDetailPage() {
       <Card>
         <h2 className="mb-3 font-semibold">Historial</h2>
         {!history ? (
-          <p className="text-sm text-muted-foreground">Cargando…</p>
+          <Loading />
         ) : (
           <ol aria-label="Historial del movimiento" className="flex flex-col gap-3">
             {[...history].reverse().map((h) => {

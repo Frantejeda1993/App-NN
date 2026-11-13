@@ -12,6 +12,7 @@ import { WORKSHOP_LABEL } from '@/features/projects/labels'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { OpeningBalancesSchema, PersonOpeningSchema, type OpeningBalances, type PersonOpening } from '@/model'
+import { Loading } from '@/components/ui/loading'
 
 const EMPTY_PERSON: PersonOpening = PersonOpeningSchema.parse({})
 
@@ -35,7 +36,7 @@ export function OpeningBalancesTab() {
   const boxes = useBoxes()
   const members = useMembers()
   const opening = useOpeningBalances()
-  if (!boxes || !members || !opening) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!boxes || !members || !opening) return <Loading />
   return <OpeningEditor boxes={boxes} members={members} state={opening} />
 }
 
@@ -178,8 +179,8 @@ function OpeningEditor({ boxes, members, state }: { boxes: Box[]; members: Membe
             </tbody>
           </table>
         </div>
-        <p role="status" className={cn('mt-3 flex items-center gap-2 text-xs', squares ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-400')}>
-          {squares ? <CheckCircle2 className="size-4 text-emerald-600" /> : <AlertTriangle className="size-4" />}
+        <p role="status" className={cn('mt-3 flex items-center gap-2 text-xs', squares ? 'text-muted-foreground' : 'text-warning')}>
+          {squares ? <CheckCircle2 className="size-4 text-success" /> : <AlertTriangle className="size-4" />}
           Suma de todos: {formatEuros(peopleTotal)} · dinero inicial en cajas: {formatEuros(boxesTotal)}
           {!squares && ` (diferencia ${formatEuros(peopleTotal - boxesTotal)}: el panel no va a cuadrar hasta que coincidan)`}
         </p>

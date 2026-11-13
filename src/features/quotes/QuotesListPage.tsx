@@ -11,6 +11,7 @@ import { STATUS_LABELS } from '@/domain/quoteLifecycle'
 import { notifyError } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { QUOTE_GROUPS, QUOTE_GROUP_LABELS, QUOTE_TONES, inQuoteGroup, startQuote, type QuoteGroup } from './shared'
+import { Loading } from '@/components/ui/loading'
 
 /** `/presupuestos`: lista con filtros por estado y búsqueda. */
 export function QuotesListPage() {
@@ -89,7 +90,7 @@ export function QuotesListPage() {
       </div>
 
       {quotes === undefined ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Loading />
       ) : filtered.length === 0 ? (
         <Card className="text-center text-sm text-muted-foreground">
           {quotes.length === 0

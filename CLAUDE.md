@@ -82,6 +82,27 @@ tocaste `firestore.rules`, también `npm run test:rules` (o el CI, que corre con
   `FakeDataApi`, tests de reglas, y **publicar las reglas antes de desplegar la app**
   (`npx firebase deploy --only firestore:rules`): el CI prueba las reglas pero no las publica.
 
+## Sistema de diseño («Taller»)
+
+Sale del logo: **nogal** (principal), **pizarra** (menú lateral, velo de diálogos) y **crema** (fondo).
+Todo está en `src/index.css`:
+
+- **Colores solo por token**: `background`, `card`, `foreground`, `muted(-foreground)`, `border`,
+  `input`, `primary`, `secondary`, `accent`, `destructive`, `success`, `warning`, `ring`,
+  `sidebar-*`. Cada token tiene versión clara y oscura (`prefers-color-scheme`). **Nunca** clases
+  de paleta sueltas (`amber-600`, `emerald-500`…) ni hex en componentes.
+- **Tipografía**: `font-display` = Calistoga (los `h1` la usan solos; títulos de diálogo y marca),
+  `font-sans` = Inter (todo lo demás). Fuentes empaquetadas con `@fontsource` (no Google Fonts:
+  CSP y modo sin conexión). Números en tablas con cifras tabulares.
+- **Componentes base** (`src/components/ui/`): `Button` (default, secondary, outline, ghost,
+  destructive; 44 px de alto en celular), `Input`/`Select`/`Textarea` (16 px de letra en celular),
+  `Field`, `Card` (sombra `shadow-sm`), `Badge` (default, success, warning, danger, muted),
+  `Dialog`, `Loading` (esqueleto con `role="status"`; usarlo en lugar de un texto «Cargando…»).
+- Elevación: `shadow-xs/sm/md/lg` (tinte cálido). Radios: `rounded-lg` controles, `rounded-xl`
+  tarjetas, `rounded-2xl` diálogos.
+- Accesibilidad: foco visible siempre, contraste ≥ 4,5:1 en ambos temas, `prefers-reduced-motion`
+  respetado, enlace «Saltar al contenido», sin información solo por color.
+
 ## Convenciones
 
 - UI y mensajes en **español rioplatense con voseo** («Elegí», «Guardá»). Comentarios en español.

@@ -16,6 +16,7 @@ import { GeneralExpensesTab } from './GeneralExpensesTab'
 import { MovementRow } from './MovementRow'
 import { TYPE_LABELS } from './labels'
 import { useWalletNames } from './useWalletNames'
+import { Loading } from '@/components/ui/loading'
 
 const TABS = {
   resumen: 'Resumen',
@@ -101,7 +102,7 @@ function MovementsTab() {
   }, [movements, opening])
   const owed = Object.entries(debts).filter(([k, c]) => k !== 'taller' && c > 0)
 
-  if (!movements || names.loading || !opening) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!movements || names.loading || !opening) return <Loading />
 
   return (
     <div className="flex flex-col gap-4">
@@ -202,7 +203,7 @@ function BoxesTab() {
     () => boxBalances(movements ?? [], (boxes ?? []).map((b) => b.id), opening?.opening.boxes),
     [movements, boxes, opening],
   )
-  if (!boxes || !movements || !opening) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!boxes || !movements || !opening) return <Loading />
   const total = boxes.filter((b) => b.active).reduce((s, b) => s + balances[b.id], 0)
 
   const save = (fn: () => ReturnType<typeof api.createBox>, msg: string) => {

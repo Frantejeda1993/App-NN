@@ -68,7 +68,10 @@ export default defineConfig({
       },
       workbox: {
         // Cachea el "app shell" para que la app abra sin conexión.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // woff2: las fuentes (Inter, Calistoga) también tienen que estar sin conexión.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
+        // Solo los alfabetos que usa la app (español): el resto no se precarga.
+        globIgnores: ['**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
         navigateFallback: 'index.html',
       },
     }),

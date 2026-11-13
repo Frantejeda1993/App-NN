@@ -44,7 +44,7 @@ export function ContactAlerts() {
       {stale.length > 0 && (
         <Card>
           <h2 className="mb-2 flex items-center gap-2 font-semibold">
-            <Clock className="size-4 text-amber-600" aria-hidden /> Sin contacto hace más de {days} días
+            <Clock className="size-4 text-warning" aria-hidden /> Sin contacto hace más de {days} días
           </h2>
           <ul aria-label={`Sin contacto hace más de ${days} días`} className="flex flex-col gap-1">
             {stale.map((c) => (

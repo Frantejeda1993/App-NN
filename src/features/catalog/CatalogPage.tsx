@@ -20,6 +20,7 @@ import {
 } from '@/model'
 import { SimpleCatalogTab } from './SimpleCatalogTab'
 import { HARDWARE_KIND_LABELS, HARDWARE_UNIT_LABELS } from './labels'
+import { Loading } from '@/components/ui/loading'
 
 const TABS = {
   materiales: 'Materiales',
@@ -51,7 +52,7 @@ export function CatalogPage() {
   const seedingRef = useRef(false)
   const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({})
 
-  if (!materials || !edges || !hardware || !rates) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!materials || !edges || !hardware || !rates) return <Loading />
   const empty = materials.length === 0 && edges.length === 0 && hardware.length === 0
 
   const releaseSeeding = () => {
@@ -229,7 +230,7 @@ const RATE_FIELDS: { key: keyof ServiceRates; label: string; hint?: string; mone
 
 function RatesTab() {
   const state = useServiceRates()
-  if (!state) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!state) return <Loading />
   // Se inicializa una vez con lo guardado; después el formulario es del usuario.
   return <RatesForm key={state.exists ? 'saved' : 'new'} state={state} />
 }
@@ -314,7 +315,7 @@ function TemplatesTab() {
   // El ref corta el doble clic en el mismo tick. Tras un alta exitosa queda
   // puesto: en cuanto existen las plantillas, el botón deja de mostrarse.
   const seedingRef = useRef(false)
-  if (!templates || !materials || !hardware) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!templates || !materials || !hardware) return <Loading />
 
   // Una vez cargadas (alguna existe), el botón ya no se muestra.
   const names = new Set(templates.map((t) => t.name.trim().toLowerCase()))

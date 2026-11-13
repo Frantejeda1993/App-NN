@@ -7,6 +7,7 @@ import { useClients, useWorkshopSettings } from '@/data/hooks'
 import { matchesSearch } from '@/domain/clients'
 import { relativeDays, todayIso } from '@/domain/dates'
 import { ContactStatusBadge } from './ContactStatusBadge'
+import { Loading } from '@/components/ui/loading'
 
 export function ClientsListPage() {
   const clients = useClients()
@@ -38,7 +39,7 @@ export function ClientsListPage() {
       </div>
 
       {clients === undefined ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Loading />
       ) : filtered.length === 0 ? (
         <Card className="text-center text-sm text-muted-foreground">
           {clients.length === 0 ? 'Todavía no hay clientes. Creá el primero.' : 'Ningún cliente coincide con la búsqueda.'}

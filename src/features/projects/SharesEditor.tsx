@@ -61,7 +61,7 @@ export function SharesEditor({
       <p
         role="status"
         aria-live="polite"
-        className={cn('mt-1 text-right text-sm font-medium', parsed.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive')}
+        className={cn('mt-1 text-right text-sm font-medium', parsed.ok ? 'text-success' : 'text-destructive')}
       >
         {parsed.ok ? `Total ${formatPercent(parsed.totalBp)}` : parsed.error}
       </p>

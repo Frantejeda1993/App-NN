@@ -8,6 +8,7 @@ import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
 import { STATUS_GROUPS, filterProjects, isDeliveryOverdue, type StatusGroup } from '@/domain/projects'
 import { cn } from '@/lib/utils'
 import { GROUP_LABELS, STATUS_LABELS, STATUS_TONES } from './labels'
+import { Loading } from '@/components/ui/loading'
 
 export function ProjectsListPage() {
   const projects = useProjects()
@@ -62,7 +63,7 @@ export function ProjectsListPage() {
       </div>
 
       {projects === undefined ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Loading />
       ) : filtered.length === 0 ? (
         <Card className="text-center text-sm text-muted-foreground">
           {projects.length === 0 ? 'Todavía no hay proyectos. Creá el primero.' : 'No hay proyectos con este filtro.'}

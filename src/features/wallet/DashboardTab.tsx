@@ -7,12 +7,13 @@ import { WORKSHOP_SHARE_KEY } from '@/domain/percent'
 import { WORKSHOP_LABEL } from '@/features/projects/labels'
 import { cn } from '@/lib/utils'
 import { useWalletTotals } from './useWalletTotals'
+import { Loading } from '@/components/ui/loading'
 
 const money = (c: number) => formatEuros(c)
 
 export function DashboardTab() {
   const data = useWalletTotals()
-  if (!data) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!data) return <Loading />
 
   const name = (k: string) => (k === WORKSHOP_SHARE_KEY ? WORKSHOP_LABEL : (data.members.find((m) => m.email === k)?.name ?? k))
   const projectTitle = (id: string) => data.projects.find((p) => p.id === id)?.title ?? id
@@ -31,7 +32,8 @@ export function DashboardTab() {
         </Card>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Dos por fila ya en el celular: los importes entran y se evita tanto desplazamiento. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Dinero en cajas" value={money(data.cash)} />
         <Kpi label="Gastos pendientes de pago" value={money(data.pending)} tone={data.pending > 0 ? 'warning' : undefined} />
         <Kpi label="El taller debe a socios" value={money(data.debts)} tone={data.debts > 0 ? 'warning' : undefined} />
@@ -99,7 +101,7 @@ export function DashboardTab() {
           role="status"
           className={cn('mt-3 flex items-center gap-2 text-xs', squares ? 'text-muted-foreground' : 'text-destructive')}
         >
-          {squares ? <CheckCircle2 className="size-4 text-emerald-600" /> : <AlertTriangle className="size-4" />}
+          {squares ? <CheckCircle2 className="size-4 text-success" /> : <AlertTriangle className="size-4" />}
           Suma de todos: {money(data.sumTotals)} = cajas {money(data.cash)} − pendientes {money(data.pending)}
           {!squares &&
             ' (no cuadra: revisá la configuración inicial o los avisos de movimientos/proyectos que no se pudieron leer)'}
@@ -177,7 +179,7 @@ function Kpi({
   return (
     <Card className={cn(strong && 'border-primary/40 bg-primary/5')}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-xl font-semibold tabular-nums', tone === 'warning' && 'text-amber-600 dark:text-amber-400')}>
+      <p className={cn('mt-1 text-lg font-semibold tabular-nums sm:text-xl', tone === 'warning' && 'text-warning')}>
         {value}
       </p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}

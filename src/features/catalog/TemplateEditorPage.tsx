@@ -9,6 +9,7 @@ import { useEdgeBanding, useHardware, useMaterials, useTemplates } from '@/data/
 import { FurnitureItemEditor, type CatalogRefs, type FurnitureDraft } from '@/features/furniture/FurnitureItemEditor'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { TemplateDataSchema } from '@/model'
+import { Loading } from '@/components/ui/loading'
 
 const back = '/catalogo?tab=plantillas'
 
@@ -43,7 +44,7 @@ export function TemplateEditorPage() {
   const hardware = useHardware()
   const edgeBanding = useEdgeBanding()
 
-  if (!templates || !materials || !hardware || !edgeBanding) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!templates || !materials || !hardware || !edgeBanding) return <Loading />
   const existing = id ? templates.find((t) => t.id === id) : undefined
   if (id && !existing) {
     return (

@@ -12,6 +12,7 @@ import { SharesEditor } from '@/features/projects/SharesEditor'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { GeneralExpenseDataSchema, type GeneralExpenseData } from '@/model'
 import { payLink } from './generalExpenseLinks'
+import { Loading } from '@/components/ui/loading'
 
 const CATEGORY_SUGGESTIONS = ['Taller', 'Alquiler', 'Servicios', 'Herramientas', 'Insumos', 'Vehículo', 'Otros']
 const toInput = (cents: number) => formatEuros(cents).replace(/\s?€/, '')
@@ -24,7 +25,7 @@ export function GeneralExpenseFormPage() {
   const members = useMembers()
   const settings = useWorkshopSettings()
 
-  if (!expenses || !members || !settings) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!expenses || !members || !settings) return <Loading />
   const existing = id ? expenses.find((g) => g.id === id) : undefined
   if (id && !existing) {
     return (

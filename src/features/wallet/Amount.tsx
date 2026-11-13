@@ -7,7 +7,7 @@ export function Amount({ cents, sign, className }: { cents: number; sign: 1 | -1
     <span
       className={cn(
         'tabular-nums font-medium',
-        sign > 0 && 'text-emerald-600 dark:text-emerald-400',
+        sign > 0 && 'text-success',
         sign < 0 && 'text-destructive',
         className,
       )}

@@ -10,6 +10,7 @@ import { formatDateEs, relativeDays, todayIso } from '@/domain/dates'
 import { ContactForm } from '@/features/clients/ContactForm'
 import { CHANNEL_LABELS } from '@/features/clients/labels'
 import { notifyError, notifyWrite } from '@/lib/notify'
+import { Loading } from '@/components/ui/loading'
 
 /**
  * Historial de contactos con el cliente dentro de la ficha del proyecto: por
@@ -55,7 +56,7 @@ export function ProjectContacts({ client, projectId }: { client: Client; project
       </label>
 
       {contacts === undefined ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Loading />
       ) : visible.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {showAll ? 'Todavía no hay contactos con este cliente.' : 'Todavía no hay contactos registrados para este proyecto.'}

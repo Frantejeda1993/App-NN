@@ -19,6 +19,7 @@ import { useProject } from '@/data/hooks'
 import { ProjectContacts } from './ProjectContacts'
 import { ProjectForm } from './ProjectForm'
 import { STATUS_LABELS, STATUS_TONES, WORKSHOP_LABEL } from './labels'
+import { Loading } from '@/components/ui/loading'
 
 export function ProjectDetailPage() {
   const { id = '' } = useParams()
@@ -34,7 +35,7 @@ export function ProjectDetailPage() {
   const editing = editingSince !== null
   const today = todayIso()
 
-  if (project === undefined) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (project === undefined) return <Loading />
   if (project === null) {
     return (
       <section className="flex flex-col gap-3">
@@ -230,7 +231,7 @@ function ProjectQuotes({ project }: { project: Project }) {
   return (
     <>
       {quotes === undefined ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Loading />
       ) : mine.length === 0 ? (
         <p className="text-sm text-muted-foreground">Todavía no hay presupuestos para este proyecto.</p>
       ) : (

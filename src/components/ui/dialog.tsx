@@ -75,7 +75,8 @@ export function Dialog({
 
   if (!open) return null
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4">
+    // Velo pizarra (no negro puro) con desenfoque leve: indica que el fondo está en pausa.
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-sidebar/60 backdrop-blur-[2px] sm:items-center sm:p-4">
       <div
         ref={panel}
         role="dialog"
@@ -83,22 +84,24 @@ export function Dialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          'flex max-h-dvh w-full flex-col bg-card text-card-foreground shadow-xl outline-none sm:max-h-[92dvh] sm:max-w-4xl sm:rounded-xl sm:border sm:border-border',
+          'flex max-h-dvh w-full flex-col bg-card text-card-foreground shadow-lg outline-none sm:max-h-[92dvh] sm:max-w-4xl sm:rounded-2xl sm:border sm:border-border',
           className,
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 id={titleId} className="text-lg font-semibold">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-3">
+          <h2 id={titleId} className="font-display text-xl tracking-tight">
             {title}
           </h2>
           <Button size="icon" variant="ghost" aria-label="Cerrar" onClick={onClose}>
             <X />
           </Button>
         </div>
-        <div data-dialog-body className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div data-dialog-body className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {children}
         </div>
-        {footer && <div className="border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>}
+        {footer && (
+          <div className="border-t border-border bg-muted/40 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:rounded-b-2xl">{footer}</div>
+        )}
       </div>
     </div>,
     document.body,

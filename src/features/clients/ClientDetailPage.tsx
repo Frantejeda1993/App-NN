@@ -14,6 +14,7 @@ import { ContactForm } from './ContactForm'
 import { CHANNEL_LABELS } from './labels'
 import { ClientDataSchema } from '@/model'
 import { ContactStatusBadge } from './ContactStatusBadge'
+import { Loading } from '@/components/ui/loading'
 
 export function ClientDetailPage() {
   const { id = '' } = useParams()
@@ -37,7 +38,7 @@ export function ClientDetailPage() {
     return (email: string) => map.get(email) ?? email
   }, [members])
 
-  if (client === undefined) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (client === undefined) return <Loading />
   if (client === null) {
     return (
       <section className="flex flex-col gap-3">
@@ -170,7 +171,7 @@ export function ClientDetailPage() {
       <Card>
         <h2 className="mb-3 font-semibold">Historial de contactos</h2>
         {contacts === undefined ? (
-          <p className="text-sm text-muted-foreground">Cargando…</p>
+          <Loading />
         ) : contacts.length === 0 ? (
           <p className="text-sm text-muted-foreground">Todavía no hay contactos registrados.</p>
         ) : (

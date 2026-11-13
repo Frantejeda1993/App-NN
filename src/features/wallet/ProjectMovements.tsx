@@ -8,6 +8,7 @@ import { formatEuros } from '@/domain/money'
 import { projectAmount, touchesProject } from '@/domain/wallet'
 import { MovementRow } from './MovementRow'
 import { useWalletNames } from './useWalletNames'
+import { Loading } from '@/components/ui/loading'
 
 /** Cobros y gastos de un proyecto, con totales y estimado vs. real. */
 export function ProjectMovements({ projectId, estimatedCostCents }: { projectId: string; estimatedCostCents: number | null }) {
@@ -71,7 +72,7 @@ export function ProjectMovements({ projectId, estimatedCostCents }: { projectId:
       </dl>
 
       {!movements || names.loading ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Loading />
       ) : list.length === 0 ? (
         <p className="text-sm text-muted-foreground">Todavía no hay cobros ni gastos en este proyecto.</p>
       ) : (

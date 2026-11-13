@@ -11,6 +11,7 @@ import { SharesEditor } from '@/features/projects/SharesEditor'
 import { useTour } from '@/features/tour/tourContext'
 import { notifyError, notifyWrite } from '@/lib/notify'
 import { WorkshopSettingsSchema } from '@/model'
+import { Loading } from '@/components/ui/loading'
 
 const FormSchema = WorkshopSettingsSchema.pick({
   name: true,
@@ -43,7 +44,7 @@ export function SettingsPage() {
     if (state && !isDirty) reset(Object.fromEntries(FORM_KEYS.map((k) => [k, state.settings[k]])) as FormValues)
   }, [state, reset, isDirty])
 
-  if (!state) return <p className="text-sm text-muted-foreground">Cargando…</p>
+  if (!state) return <Loading />
 
   return (
     <section className="flex max-w-xl flex-col gap-4">
@@ -160,7 +161,7 @@ function DefaultSharesCard() {
         Con esta participación arranca cada proyecto nuevo. Después se puede cambiar en cada uno.
       </p>
       {discarded && (
-        <p role="note" className="mb-3 rounded-md bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-300">
+        <p role="note" className="mb-3 rounded-lg bg-warning/12 p-3 text-sm text-warning ring-1 ring-inset ring-warning/25">
           El reparto guardado incluía a un socio que ya no está activo, así que se usa partes iguales. Revisalo y guardalo de nuevo.
         </p>
       )}
